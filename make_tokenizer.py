@@ -1,12 +1,10 @@
 import pandas as pd
-import numpy as np
 import argparse
 import os
 import nsml
 from nsml import HAS_DATASET, DATASET_PATH
 from glob import glob
 import json
-import pickle
 
 class Preprocess:
 
@@ -95,8 +93,13 @@ def bind_model(model, parser):
     # 학습한 모델을 저장하는 함수입니다.
     def save(dir_name, *parser):
         # directory
-        os.makedirs('tokenizer', exist_ok=True)
-        model.save('tokenizer')
+        print(dir_name)
+        os.makedirs(dir_name, exist_ok=True)
+        save_dir = os.path.join(dir_name, 'tokenizer.json')
+        vocab = tokenizer.get_vocab()
+        print(len(vocab))
+        print(vocab)
+        model.save(save_dir)
         
         print("저장 완료!")
 
@@ -148,26 +151,30 @@ if __name__ == '__main__':
 
     split_point = int(len(train_data) * 0.9)
 
-    train_set, valid_set = preprocessor.train_valid_split(train_data, split_point)
+    #train_set, valid_set = preprocessor.train_valid_split(train_data, split_point)
 
-    encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_set)
-    encoder_input_val, decoder_input_val, decoder_output_val = preprocessor.make_model_input(valid_set, is_valid = True)
+    encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
 
     tokenizer = BertWordPieceTokenizer(
-        vocab_file=None,
+        None,
         clean_text=True,
         handle_chinese_chars=True,
         strip_accents=False, # Must be False if cased model
         lowercase=False,
-        wordpieces_prefix="##"
+        wordpieces_prefix="##",
     )
+    tokenizer.add_special_tokens(["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
     tokenizer.train_from_iterator(
-        files=encoder_input_train['dialogue'],
-        limit_alphabet=args.limit_alphabet,
-        vocab_size=args.vocab_size
+        encoder_input_train,
+        vocab_size=150000,
+        min_frequency=2,
+        show_progress=True,
+        special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"],
+        limit_alphabet=1000,
+        wordpieces_prefix="##",
     )
 
     bind_model(model=tokenizer, parser=args)
 
     # DONOTCHANGE (You can decide how often you want to save the model)
-    nsml.save()
+    nsml.save(0)

@@ -1,14 +1,11 @@
 #nsml: dacon/nia-tf:1.0
 
 from distutils.core import setup
-
-import tokenizers
-
 setup(
     name='ladder_networks',
     version='1.0',
     install_requires=[
-        'tokenizers',
-        'transformers'
+        'tokenizers==0.10.3',
+        'transformers==4.5.0'
     ]
 )
