@@ -6,6 +6,7 @@ setup(
     version='1.0',
     install_requires=[
         'tokenizers==0.10.3',
-        'transformers==4.5.0'
+        'transformers==4.11.3',
+        'torch'
     ]
 )

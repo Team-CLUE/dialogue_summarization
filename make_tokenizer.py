@@ -1,10 +1,12 @@
 import pandas as pd
+import numpy as np
 import argparse
 import os
 import nsml
 from nsml import HAS_DATASET, DATASET_PATH
 from glob import glob
 import json
+import re
 
 class Preprocess:
 
@@ -89,17 +91,30 @@ def train_data_loader(root_path) :
     pathes = glob(train_path)
     return pathes
 
+import pickle
 def bind_model(model, parser):
     # 학습한 모델을 저장하는 함수입니다.
     def save(dir_name, *parser):
         # directory
         print(dir_name)
         os.makedirs(dir_name, exist_ok=True)
-        save_dir = os.path.join(dir_name, 'tokenizer.json')
+        save_dir = os.path.join(dir_name, 'vocab.txt')
         vocab = tokenizer.get_vocab()
         print(len(vocab))
-        print(vocab)
-        model.save(save_dir)
+
+        vocabulary = [[v, k] for k, v in vocab.items()]
+        vocabulary = list(np.array(vocabulary)[:, 1])
+
+        # for idx in range(len(vocabulary)):
+        #     vocabulary[idx] = re.sub('[^가-힣a-zA-Z0-9]',' ',vocabulary[idx]).strip()
+
+        with open(save_dir, 'w+') as lf:
+            lf.write('\n'.join(vocabulary))
+
+        # with open(save_dir, 'wb') as lf:
+        #     pickle.dump(vocabulary, lf)
+
+        #model.save(save_dir)
         
         print("저장 완료!")
 
@@ -142,19 +157,18 @@ if __name__ == '__main__':
     train_path_list.sort()
 
     preprocessor = Preprocess()
+
     #################
     # Data Load
     #################
     train_json_list = preprocessor.make_dataset_list(train_path_list)
-
     train_data= preprocessor.make_set_as_df(train_json_list)
-
-    split_point = int(len(train_data) * 0.9)
-
-    #train_set, valid_set = preprocessor.train_valid_split(train_data, split_point)
-
     encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
 
+    #################
+    # Make tokenizer and train
+    ################# 
+    print('-'*10, 'Make tokenizer and train', '-'*10,)
     tokenizer = BertWordPieceTokenizer(
         None,
         clean_text=True,
@@ -166,15 +180,14 @@ if __name__ == '__main__':
     tokenizer.add_special_tokens(["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
     tokenizer.train_from_iterator(
         encoder_input_train,
-        vocab_size=150000,
+        vocab_size=36000,
         min_frequency=2,
         show_progress=True,
         special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"],
-        limit_alphabet=1000,
         wordpieces_prefix="##",
     )
+    print('-'*10, 'Make tokenizer and train complete', '-'*10,)
 
     bind_model(model=tokenizer, parser=args)
-
     # DONOTCHANGE (You can decide how often you want to save the model)
     nsml.save(0)

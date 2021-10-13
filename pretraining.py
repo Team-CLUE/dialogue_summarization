@@ -6,6 +6,20 @@ from nsml import HAS_DATASET, DATASET_PATH
 from glob import glob
 import json
 
+import torch
+from torch.utils.data import Dataset
+from transformers.tokenization_utils import PreTrainedTokenizer
+from transformers import BertTokenizer
+from transformers import DistilBertConfig, DistilBertForMaskedLM
+from transformers import DataCollatorForLanguageModeling
+from transformers import Trainer, TrainingArguments
+#from transformers import LineByLineTextDataset
+from tokenizers import BertWordPieceTokenizer 
+
+from typing import Dict, List, Optional
+import os
+import pickle
+
 class Preprocess:
 
     @staticmethod
@@ -94,28 +108,24 @@ def bind_model(model, parser):
     def save(dir_name, *parser):
         # directory
         os.makedirs(dir_name, exist_ok=True)
-        save_dir = os.path.join(dir_name, 'tokenizer')
-        model.save(save_dir)
+        save_dir = os.path.join(dir_name, 'model')
+        model.save_pretrained(save_dir)
         
         print("저장 완료!")
 
     # 저장한 모델을 불러올 수 있는 함수입니다.
-    def load(dir_name, *parser):       
-        save_dir = os.path.join(dir_name, 'tokenizer.json')
-        with open(save_dir) as f:
-            json_data_list = json.load(f)
-        print(json_data_list['model']['vocab'])
-        model = BertWordPieceTokenizer(
-            json_data_list['model']['vocab'],
-            clean_text=True,
-            handle_chinese_chars=True,
-            strip_accents=False, # Must be False if cased model
-            lowercase=False,
-            wordpieces_prefix="##",
-        )
+    def load(dir_name, *parser):      
+        global tokenizer 
+        save_dir = os.path.join(dir_name, 'vocab.txt')
+        # with open(save_dir, 'rb') as lf:
+        #     readList = pickle.load(lf)
         
+        tokenizer = BertTokenizer(
+            vocab_file = save_dir,
+        )
+        #tokenizer.add_special_tokens(["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
+        print(tokenizer)
         print("로딩 완료!")
-        return model
 
     def infer(test_path, **kwparser):
 
@@ -132,10 +142,21 @@ def bind_model(model, parser):
     # nsml에서 지정한 함수에 접근할 수 있도록 하는 함수입니다.
     nsml.bind(save=save, load=load, infer=infer)
 
-\
+class LineByLineTextDataset(Dataset):
+    """
+    This will be superseded by a framework-agnostic approach soon.
+    """
 
-from tokenizers import BertWordPieceTokenizer 
-import os
+    def __init__(self, tokenizer: PreTrainedTokenizer, data, block_size: int):
+        batch_encoding = tokenizer(list(data), add_special_tokens=True, truncation=True, max_length=block_size)
+        self.examples = batch_encoding["input_ids"]
+        self.examples = [{"input_ids": torch.tensor(e, dtype=torch.long)} for e in self.examples]
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self, i):
+        return self.examples[i]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='nia_test')
@@ -155,28 +176,73 @@ if __name__ == '__main__':
     #################
     # Data Load
     #################
+    print('-'*10, 'Load data', '-'*10,)
     train_json_list = preprocessor.make_dataset_list(train_path_list)
-
     train_data= preprocessor.make_set_as_df(train_json_list)
-
-    split_point = int(len(train_data) * 0.9)
-
-    #train_set, valid_set = preprocessor.train_valid_split(train_data, split_point)
-
     encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
-
-    tokenizer = BertWordPieceTokenizer()
+    print('-'*10, 'Load data complete', '-'*10,)
 
     #################
     # Load tokenizer
-    #################
-    
+    ################# 
+    print('-'*10, 'Load tokenizer', '-'*10,)
+    tokenizer = BertWordPieceTokenizer()
     bind_model(model=tokenizer, parser=args)
 
-    nsml.load(checkpoint='0', session='nia2012/dialogue/87')
+    nsml.load(checkpoint='0', session='nia2012/dialogue/136')
+    print('-'*10, 'Load tokenizer complete', '-'*10,)
+    
+    config = DistilBertConfig()
+    model = DistilBertForMaskedLM(config=config)
 
-    tokenized_sequence = tokenizer.encode("이순신은 조선의 무신이다.")
-    print(tokenized_sequence)
+    #################
+    # Set dataset and trainer
+    #################
+    print('-'*10, 'Set dataset and trainer', '-'*10,)
+    model.resize_token_embeddings(len(tokenizer))
+    dataset = LineByLineTextDataset(
+        tokenizer=tokenizer,
+        data=encoder_input_train,
+        block_size=512,
+    )
+    # set mlm task
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer, mlm=True, mlm_probability=0.15
+    )
+    # set training args
+    training_args = TrainingArguments(
+        output_dir='./',
+        overwrite_output_dir=True,
+        num_train_epochs=10,
+        per_device_train_batch_size=16,
+        gradient_accumulation_steps=10,
+        evaluation_strategy = 'steps',
+        save_steps=500,
+        save_total_limit=5,
+        load_best_model_at_end=True,
+        seed=42,
+    )
+    # set Trainer class for pre-training
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=dataset,
+        eval_dataset=dataset,    
+    )
+    print('-'*10, 'Set dataset and trainer complete', '-'*10,)
 
-    # DONOTCHANGE (You can decide how often you want to save the model)
-    # nsml.save(0)
+    #################
+    # Start pretraining
+    #################
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    print('-'*10, 'Start pretraining:\t', device, '-'*10,)
+    trainer.train()
+
+    bind_model(model=model, parser=args)
+    print('-'*10, 'Pretraing complete', '-'*10,)
+
+    nsml.save(0)
+    print('-'*10, '저장완료!', '-'*10,)
+    #DONOTCHANGE (You can decide how often you want to save the model)
+    #nsml.save(0)
