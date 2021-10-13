@@ -1,0 +1,7 @@
+dynamicconv_cuda.cpp
+dynamicconv_cuda_kernel.cu
+setup.py
+dynamicconv_layer.egg-info/PKG-INFO
+dynamicconv_layer.egg-info/SOURCES.txt
+dynamicconv_layer.egg-info/dependency_links.txt
+dynamicconv_layer.egg-info/top_level.txt
