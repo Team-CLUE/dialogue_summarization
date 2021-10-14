@@ -75,23 +75,22 @@ class Preprocess:
         elif is_valid:
             encoder_input = dataset['dialogue']
             decoder_input = ['sostoken'] * len(dataset)
-            decoder_output = dataset['summary'].apply(lambda x: str(x) + 'eostoken')
+            decoder_output = dataset['summary'].apply(lambda x: str(x) + '[SEP]')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : 'sostoken' + str(x))
-            decoder_output = dataset['summary'].apply(lambda x : str(x) + 'eostoken')
+            decoder_input = dataset['summary'].apply(lambda x : '[CLS]' + str(x))
+            decoder_output = dataset['summary'].apply(lambda x : str(x) + '[SEP]')
 
-            return encoder_input, decoder_input, decoder_output
+            return list(encoder_input) + list(decoder_input), decoder_output
 
 def train_data_loader(root_path) :
     train_path = os.path.join(root_path, 'train', 'train_data', '*')
     pathes = glob(train_path)
     return pathes
 
-import pickle
 def bind_model(model, parser):
     # 학습한 모델을 저장하는 함수입니다.
     def save(dir_name, *parser):
@@ -105,17 +104,9 @@ def bind_model(model, parser):
         vocabulary = [[v, k] for k, v in vocab.items()]
         vocabulary = list(np.array(vocabulary)[:, 1])
 
-        # for idx in range(len(vocabulary)):
-        #     vocabulary[idx] = re.sub('[^가-힣a-zA-Z0-9]',' ',vocabulary[idx]).strip()
-
         with open(save_dir, 'w+') as lf:
             lf.write('\n'.join(vocabulary))
 
-        # with open(save_dir, 'wb') as lf:
-        #     pickle.dump(vocabulary, lf)
-
-        #model.save(save_dir)
-        
         print("저장 완료!")
 
     # 저장한 모델을 불러올 수 있는 함수입니다.
@@ -163,7 +154,10 @@ if __name__ == '__main__':
     #################
     train_json_list = preprocessor.make_dataset_list(train_path_list)
     train_data= preprocessor.make_set_as_df(train_json_list)
-    encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
+    encoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
+
+    #input_train = np.concatenate([list(encoder_input_train), list(decoder_input_train)], axis=0)
+    print(len(encoder_input_train))
 
     #################
     # Make tokenizer and train
@@ -177,13 +171,13 @@ if __name__ == '__main__':
         lowercase=False,
         wordpieces_prefix="##",
     )
-    tokenizer.add_special_tokens(["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
+    tokenizer.add_special_tokens(["[PAD]", "[CLS]", "[UNK]", "[SEP]", "[MASK]"]) #"<pad>", "<s>", "</s>", "<sep>", "<mask>"
     tokenizer.train_from_iterator(
         encoder_input_train,
         vocab_size=36000,
         min_frequency=2,
         show_progress=True,
-        special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"],
+        special_tokens = ["[PAD]", "[CLS]", "[UNK]", "[SEP]", "[MASK]"],#"<pad>", "<s>", "</s>", "<sep>", "<mask>"
         wordpieces_prefix="##",
     )
     print('-'*10, 'Make tokenizer and train complete', '-'*10,)

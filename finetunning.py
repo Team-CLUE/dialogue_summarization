@@ -6,22 +6,15 @@ from nsml import HAS_DATASET, DATASET_PATH
 from glob import glob
 import json
 
-import numpy as np
 import torch
-from torch.utils.data import Dataset
-from transformers.tokenization_utils import PreTrainedTokenizer
-from transformers import BartTokenizer, RobertaTokenizer, BertTokenizer
-from transformers import BartForCausalLM, BartConfig
-from transformers import DataCollatorForLanguageModeling
+from torch.utils.data import Dataset, DataLoader
+from transformers import BertTokenizer
+from transformers import BartForConditionalGeneration, BartConfig
 from transformers import Trainer, TrainingArguments
-#from transformers import LineByLineTextDataset
-from tokenizers import BertWordPieceTokenizer 
 
 from typing import Dict, List, Optional
 import os
 import pickle
-
-from transformers.utils.dummy_sentencepiece_objects import BarthezTokenizer
 
 class Preprocess:
 
@@ -90,16 +83,16 @@ class Preprocess:
         elif is_valid:
             encoder_input = dataset['dialogue']
             decoder_input = ['sostoken'] * len(dataset)
-            decoder_output = dataset['summary'].apply(lambda x: str(x) + '[SEP]')
+            decoder_output = dataset['summary'].apply(lambda x: str(x) + 'eostoken')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : '[CLS]' + str(x))
-            decoder_output = dataset['summary'].apply(lambda x : str(x) + '[SEP]')
+            decoder_input = dataset['summary'].apply(lambda x : 'sostoken' + str(x))
+            decoder_output = dataset['summary'].apply(lambda x : str(x) + 'eostoken')
 
-            return list(encoder_input) + list(decoder_input), decoder_output
+            return encoder_input, decoder_input, decoder_output
 
 def train_data_loader(root_path) :
     train_path = os.path.join(root_path, 'train', 'train_data', '*')
@@ -118,17 +111,18 @@ def bind_model(model, parser):
 
     # 저장한 모델을 불러올 수 있는 함수입니다.
     def load(dir_name, *parser):      
-        global tokenizer 
-        save_dir = os.path.join(dir_name, 'vocab.txt')
-        # with open(save_dir, 'rb') as lf:
-        #     readList = pickle.load(lf)
-        # BertTokenizer
-        tokenizer = BertTokenizer(
-            vocab_file = save_dir,
-        )
-        #tokenizer.add_special_tokens(["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
-        print(tokenizer)
-        print("로딩 완료!")
+        if parser.types == 'tokenizer':
+            global tokenizer 
+            save_dir = os.path.join(dir_name, 'vocab.txt')            
+            tokenizer = BertTokenizer(
+                vocab_file = save_dir,
+            )
+            print("tokenizer 로딩 완료!")
+        else:
+            global generate_model
+            save_dir = os.path.join(dir_name, 'model')
+            generate_model.from_pretrained(save_dir)
+            print("model 로딩 완료!")
 
     def infer(test_path, **kwparser):
 
@@ -144,26 +138,6 @@ def bind_model(model, parser):
     # DONOTCHANGE: They are reserved for nsml
     # nsml에서 지정한 함수에 접근할 수 있도록 하는 함수입니다.
     nsml.bind(save=save, load=load, infer=infer)
-
-class LineByLineTextDataset(Dataset):
-    """
-    This will be superseded by a framework-agnostic approach soon.
-    """
-
-    def __init__(self, tokenizer: PreTrainedTokenizer, data, block_size: int):
-        print(len(data))
-        print(data[:10])
-        print(data[-10:])
-        
-        batch_encoding = tokenizer(data, add_special_tokens=True, truncation=True, max_length=block_size)
-        self.examples = batch_encoding["input_ids"]
-        self.examples = [{"input_ids": torch.tensor(e, dtype=torch.long)} for e in self.examples]
-
-    def __len__(self):
-        return len(self.examples)
-
-    def __getitem__(self, i):
-        return self.examples[i]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='nia_test')
@@ -186,40 +160,36 @@ if __name__ == '__main__':
     print('-'*10, 'Load data', '-'*10,)
     train_json_list = preprocessor.make_dataset_list(train_path_list)
     train_data= preprocessor.make_set_as_df(train_json_list)
-    encoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
+    encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
     print('-'*10, 'Load data complete', '-'*10,)
 
-    #input_train = np.concatenate([list(encoder_input_train), list(decoder_input_train)], axis=0)
-    print(len(encoder_input_train))
-    print(encoder_input_train[145630:145640])
-
     #################
-    # Load tokenizer
+    # Load tokenizer & model
     ################# 
-    print('-'*10, 'Load tokenizer', '-'*10,)
-    tokenizer = BertWordPieceTokenizer()
+    print('-'*10, 'Load tokenizer & model', '-'*10,)
+    tokenizer = None
+    args.types = 'tokenizer'
     bind_model(model=tokenizer, parser=args)
 
     nsml.load(checkpoint='0', session='nia2012/dialogue/161')
-    print('-'*10, 'Load tokenizer complete', '-'*10,)
-    
+    print('-'*10, 'Load tokenizer & model complete', '-'*10,)
+
+    args.types = 'model'
     config = BartConfig()
-    model = BartForCausalLM(config=config)
-    
+    generate_model = BartForConditionalGeneration(config=config)
+
+    bind_model(model=generate_model, parser=args)
+    nsml.load(checkpoint='0', session='nia2012/dialogue/162')
+
     #################
     # Set dataset and trainer
     #################
     print('-'*10, 'Set dataset and trainer', '-'*10,)
-    model.resize_token_embeddings(len(tokenizer))
-    dataset = LineByLineTextDataset(
-        tokenizer=tokenizer,
-        data=encoder_input_train,
-        block_size=512,
-    )
-    # set mlm task  DataCollatorForSOP(DataCollatorForLanguageModeling)
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, mlm=True, mlm_probability=0.15
-    )
+    generate_model.resize_token_embeddings(len(tokenizer))
+
+    # Dataset, Dataloader
+    
+    
     # set training args
     training_args = TrainingArguments(
         output_dir='./',
@@ -235,32 +205,12 @@ if __name__ == '__main__':
     )
     # set Trainer class for pre-training
     trainer = Trainer(
-        model=model,
+        model=generate_model,
         args=training_args,
-        data_collator=data_collator,
-        train_dataset=dataset,
-        eval_dataset=dataset,    
+        train_dataset=train_dataloader,
+        eval_dataset=train_dataloader,    
     )
     print('-'*10, 'Set dataset and trainer complete', '-'*10,)
-
-    #################
-    # Start pretraining
-    #################
-    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-    print('-'*10, 'Start pretraining:\t', device, '-'*10,)
-    trainer.train()
-
-    bind_model(model=model, parser=args)
-    print('-'*10, 'Pretraing complete', '-'*10,)
-
-    nsml.save(0)
-    print('-'*10, '저장완료!', '-'*10,)
+ 
     #DONOTCHANGE (You can decide how often you want to save the model)
     #nsml.save(0)
-
-
-    # 내일 해볼 것
-    # BertTokenizer에서 CLS 대신 sostoken으로 변경하고
-    # tokenizer도 동일하게 적용해서 학습한걸로 바꾸고
-    # Summary 문장도 sostoken을 붙여서 돌려보기
-    
