@@ -13,7 +13,7 @@ from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers import BartTokenizer, RobertaTokenizer, BertTokenizer
 from transformers import BartForCausalLM, BartConfig
 from transformers import DataCollatorForLanguageModeling
-from transformers import Trainer, TrainingArguments
+from transformers import Trainer, TrainingArguments, Seq2SeqTrainingArguments, Seq2SeqTrainer
 #from transformers import LineByLineTextDataset
 from tokenizers import BertWordPieceTokenizer 
 
@@ -45,7 +45,7 @@ class Preprocess:
             for topic in train_set:
                 for data in topic['data']:
                     train_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
-                    train_dialogue.append(''.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
+                    train_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
                     train_summary.append(data['body']['summary'])
 
             train_data = pd.DataFrame(
@@ -63,7 +63,7 @@ class Preprocess:
             for topic in train_set:
                 for data in topic['data']:
                     test_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
-                    test_dialogue.append(''.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
+                    test_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
 
             test_data = pd.DataFrame(
                 {
@@ -90,14 +90,14 @@ class Preprocess:
         elif is_valid:
             encoder_input = dataset['dialogue']
             decoder_input = ['sostoken'] * len(dataset)
-            decoder_output = dataset['summary'].apply(lambda x: str(x) + '[SEP]')
+            decoder_output = dataset['summary'].apply(lambda x: str(x) + ' [SEP] ')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : '[CLS]' + str(x))
-            decoder_output = dataset['summary'].apply(lambda x : str(x) + '[SEP]')
+            decoder_input = dataset['summary'].apply(lambda x : ' [CLS] ' + str(x) + ' [SEP] ')
+            decoder_output = dataset['summary'].apply(lambda x : str(x) + ' [SEP] ')
 
             return list(encoder_input) + list(decoder_input), decoder_output
 
@@ -125,6 +125,7 @@ def bind_model(model, parser):
         # BertTokenizer
         tokenizer = BertTokenizer(
             vocab_file = save_dir,
+            do_basic_tokenize=False,
         )
         #tokenizer.add_special_tokens(["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
         print(tokenizer)
@@ -200,11 +201,11 @@ if __name__ == '__main__':
     tokenizer = BertWordPieceTokenizer()
     bind_model(model=tokenizer, parser=args)
 
-    nsml.load(checkpoint='0', session='nia2012/dialogue/161')
+    nsml.load(checkpoint='0', session='nia2012/dialogue/164')
     print('-'*10, 'Load tokenizer complete', '-'*10,)
     
     config = BartConfig()
-    model = BartForCausalLM(config=config)
+    model = BartForCausalLM(config=config, max_len=256)
     
     #################
     # Set dataset and trainer
@@ -221,20 +222,21 @@ if __name__ == '__main__':
         tokenizer=tokenizer, mlm=True, mlm_probability=0.15
     )
     # set training args
-    training_args = TrainingArguments(
+    training_args = Seq2SeqTrainingArguments(
         output_dir='./',
         overwrite_output_dir=True,
         num_train_epochs=10,
         per_device_train_batch_size=16,
         gradient_accumulation_steps=10,
         evaluation_strategy = 'steps',
-        save_steps=500,
+        eval_steps=15000,
+        save_steps=15000,
         save_total_limit=5,
         load_best_model_at_end=True,
         seed=42,
     )
     # set Trainer class for pre-training
-    trainer = Trainer(
+    trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
         data_collator=data_collator,

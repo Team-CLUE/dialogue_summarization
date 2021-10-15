@@ -30,7 +30,7 @@ class Preprocess:
             for topic in train_set:
                 for data in topic['data']:
                     train_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
-                    train_dialogue.append(''.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
+                    train_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
                     train_summary.append(data['body']['summary'])
 
             train_data = pd.DataFrame(
@@ -48,7 +48,7 @@ class Preprocess:
             for topic in train_set:
                 for data in topic['data']:
                     test_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
-                    test_dialogue.append(''.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
+                    test_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
 
             test_data = pd.DataFrame(
                 {
@@ -81,8 +81,8 @@ class Preprocess:
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : '[CLS]' + str(x))
-            decoder_output = dataset['summary'].apply(lambda x : str(x) + '[SEP]')
+            decoder_input = dataset['summary'].apply(lambda x : ' [CLS] ' + str(x))
+            decoder_output = dataset['summary'].apply(lambda x : str(x) + ' [SEP] ')
 
             return list(encoder_input) + list(decoder_input), decoder_output
 
