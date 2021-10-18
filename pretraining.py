@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from transformers.tokenization_utils import PreTrainedTokenizer
-from transformers import BartTokenizer, RobertaTokenizer, BertTokenizer
+from transformers import AutoTokenizer
 from transformers import BartForCausalLM, BartConfig
 from transformers import DataCollatorForLanguageModeling
 from transformers import Trainer, TrainingArguments, Seq2SeqTrainingArguments, Seq2SeqTrainer
@@ -84,20 +84,20 @@ class Preprocess:
     def make_model_input(dataset, is_valid=False, is_test = False):
         if is_test:
             encoder_input = dataset['dialogue']
-            decoder_input = ['sostoken'] * len(dataset)
+            decoder_input = ['<s>'] * len(dataset)
             return encoder_input, decoder_input
 
         elif is_valid:
             encoder_input = dataset['dialogue']
-            decoder_input = ['sostoken'] * len(dataset)
-            decoder_output = dataset['summary'].apply(lambda x: str(x) + ' [SEP] ')
+            decoder_input = ['<s>'] * len(dataset)
+            decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : ' [CLS] ' + str(x) + ' [SEP] ')
-            decoder_output = dataset['summary'].apply(lambda x : str(x) + ' [SEP] ')
+            decoder_input = dataset['summary'].apply(lambda x : '<s>' + str(x))
+            decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
 
             return list(encoder_input) + list(decoder_input), decoder_output
 
@@ -118,17 +118,7 @@ def bind_model(model, parser):
 
     # 저장한 모델을 불러올 수 있는 함수입니다.
     def load(dir_name, *parser):      
-        global tokenizer 
-        save_dir = os.path.join(dir_name, 'vocab.txt')
-        # with open(save_dir, 'rb') as lf:
-        #     readList = pickle.load(lf)
-        # BertTokenizer
-        tokenizer = BertTokenizer(
-            vocab_file = save_dir,
-            do_basic_tokenize=False,
-        )
-        #tokenizer.add_special_tokens(["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
-        print(tokenizer)
+        # tokenizer pretrained 사용
         print("로딩 완료!")
 
     def infer(test_path, **kwparser):
@@ -197,11 +187,9 @@ if __name__ == '__main__':
     #################
     # Load tokenizer
     ################# 
-    print('-'*10, 'Load tokenizer', '-'*10,)
-    tokenizer = BertWordPieceTokenizer()
-    bind_model(model=tokenizer, parser=args)
-
-    nsml.load(checkpoint='0', session='nia2012/dialogue/164')
+    tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
+    special_tokens_dict = {'additional_special_tokens': ['#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
+    tokenizer.add_special_tokens(special_tokens_dict)
     print('-'*10, 'Load tokenizer complete', '-'*10,)
     
     config = BartConfig()
@@ -231,7 +219,8 @@ if __name__ == '__main__':
         evaluation_strategy = 'steps',
         eval_steps=15000,
         save_steps=15000,
-        save_total_limit=5,
+        save_total_limit=1,
+        fp16=True,
         load_best_model_at_end=True,
         seed=42,
     )

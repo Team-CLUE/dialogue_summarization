@@ -167,7 +167,7 @@ def bind_model(model,types, parser):
         #print(f'test_data:\n{test_data["dialogue"]}')
         encoder_input_test, decoder_input_test = preprocessor.make_model_input(test_data, is_test= True)
 
-        tokenized_encoder_inputs = tokenizer(list(encoder_input_test), return_tensors="pt", add_special_tokens=False, padding=True, truncation=True, max_length=256, return_token_type_ids=False,)
+        tokenized_encoder_inputs = tokenizer(list(encoder_input_test), return_tensors="pt", add_special_tokens=True, padding=True, truncation=True, max_length=256, return_token_type_ids=False,)
         #tokenized_decoder_inputs = tokenizer.tokenize(decoder_input_test, return_tensors="pt", padding=True, add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
         print(tokenized_encoder_inputs['input_ids'][0:10])
 
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     tokenizer = None
     bind_model(model=tokenizer, types='tokenizer', parser=args)
 
-    nsml.load(checkpoint='0', session='nia2012/dialogue/164')
+    nsml.load(checkpoint='0', session='nia2012/dialogue/219')
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
     config = BartConfig()

@@ -8,13 +8,14 @@ import json
 
 import torch
 from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizer
+from transformers import BertTokenizer, AutoTokenizer
 from transformers import BartForConditionalGeneration, BartConfig
 from transformers import Trainer, TrainingArguments, Seq2SeqTrainingArguments, Seq2SeqTrainer
 
 from typing import Dict, List, Optional
 import os
 import pickle
+from tqdm import tqdm
 
 class Mydataset(Dataset):
     def __init__(self, encoder_input, decoder_input, labels, len):
@@ -98,20 +99,20 @@ class Preprocess:
     def make_model_input(dataset, is_valid=False, is_test = False):
         if is_test:
             encoder_input = dataset['dialogue']
-            decoder_input = ['sostoken'] * len(dataset)
+            decoder_input = ['<s>'] * len(dataset)
             return encoder_input, decoder_input
 
         elif is_valid:
             encoder_input = dataset['dialogue']
-            decoder_input = ['sostoken'] * len(dataset)
-            decoder_output = dataset['summary'].apply(lambda x: str(x) + ' [SEP] ')
+            decoder_input = ['<s>'] * len(dataset)
+            decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : ' [CLS] ' + str(x))
-            decoder_output = dataset['summary'].apply(lambda x : str(x) + ' [SEP] ')
+            decoder_input = dataset['summary'].apply(lambda x : '<s>' + str(x))
+            decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
 
@@ -133,12 +134,7 @@ def bind_model(model,types, parser):
     # 저장한 모델을 불러올 수 있는 함수입니다.
     def load(dir_name, *parser):      
         if types == 'tokenizer':
-            global tokenizer 
-            save_dir = os.path.join(dir_name, 'vocab.txt')            
-            tokenizer = BertTokenizer(
-                vocab_file = save_dir,
-                do_basic_tokenize=False,
-            )
+            # pretrained 사용
             print("tokenizer 로딩 완료!")
         else:
             global generate_model
@@ -147,6 +143,11 @@ def bind_model(model,types, parser):
             print("model 로딩 완료!")
 
     def infer(test_path, **kwparser):
+        global tokenizer
+        global generate_model
+        print(tokenizer)
+        print(generate_model)
+
         preprocessor = Preprocess()
 
         test_json_path = os.path.join(test_path, 'test_data', '*')
@@ -158,15 +159,18 @@ def bind_model(model,types, parser):
         test_json_list = preprocessor.make_dataset_list(test_path_list)
         test_data = preprocessor.make_set_as_df(test_json_list)
 
-        print(f'test_data:\n{test_data["dialogue"]}')
+        #print(f'test_data:\n{test_data["dialogue"]}')
         encoder_input_test, decoder_input_test = preprocessor.make_model_input(test_data, is_test= True)
 
-        tokenized_encoder_inputs = tokenizer(encoder_input_test, return_tensors="pt", padding=True, add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
+        tokenized_encoder_inputs = tokenizer(list(encoder_input_test), return_tensors="pt", add_special_tokens=True, padding=True, truncation=True, max_length=256, return_token_type_ids=False,)
         #tokenized_decoder_inputs = tokenizer.tokenize(decoder_input_test, return_tensors="pt", padding=True, add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
-        
+        print(tokenized_encoder_inputs['input_ids'][0:10])
+
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        generated_ids = generate_model.generate(input_ids=tokenized_encoder_inputs['input_ids'].to(device), max_length=30, num_beams=2)
-        summary = [tokenizer.decode(g_ids, skip_special_tokens=True) for g_ids in generated_ids.cpu().numpy()]
+        summary = []
+        for idx in tqdm(range(len(tokenized_encoder_inputs['input_ids']))):
+            generated_ids = generate_model.generate(input_ids=[tokenized_encoder_inputs['input_ids'][idx].to(device)], max_length=100, num_beams=2)
+            summary.append(tokenizer.decode(generated_ids, skip_special_tokens=True))
 
         # DONOTCHANGE: They are reserved for nsml
         # 리턴 결과는 [(확률, 0 or 1)] 의 형태로 보내야만 리더보드에 올릴 수 있습니다.
@@ -206,10 +210,11 @@ if __name__ == '__main__':
     # Load tokenizer & model
     ################# 
     print('-'*10, 'Load tokenizer & model', '-'*10,)
-    tokenizer = None
-    bind_model(model=tokenizer, types='tokenizer', parser=args)
+    tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
+    special_tokens_dict = {'additional_special_tokens': ['#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
+    tokenizer.add_special_tokens(special_tokens_dict)
 
-    nsml.load(checkpoint='0', session='nia2012/dialogue/164')
+    nsml.load(checkpoint='0', session='nia2012/dialogue/219')
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
     config = BartConfig()
@@ -249,11 +254,13 @@ if __name__ == '__main__':
             output_dir='./',
             overwrite_output_dir=True,
             num_train_epochs=1,
-            per_device_train_batch_size=16,
+            per_device_train_batch_size=32,
+            per_device_eval_batch_size=32,
             gradient_accumulation_steps=10,
             evaluation_strategy = 'epoch',
             save_strategy = 'epoch',
             save_total_limit=1,
+            fp16=True,
             load_best_model_at_end=True,
             seed=42,
         )
@@ -261,12 +268,12 @@ if __name__ == '__main__':
         trainer = Seq2SeqTrainer(
             model=generate_model,
             args=training_args,
-            train_dataset=encoder_inputs_dataset,
+            train_dataset=encoder_inputs_dataset,  
             eval_dataset=encoder_inputs_dataset,    
         )
         print('-'*10, 'Make trainer complete', '-'*10,)
     
         #DONOTCHANGE (You can decide how often you want to save the model)
-        for epoch in range(15):
+        for epoch in range(2):
             trainer.train()
             nsml.save(epoch)
