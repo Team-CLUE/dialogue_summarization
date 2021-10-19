@@ -102,7 +102,7 @@ def bind_model(model, parser):
         print(len(vocab))
 
         vocabulary = [[v, k] for k, v in vocab.items()]
-        vocabulary = sorted(vocabulary)
+        #vocabulary = sorted(vocabulary)
         vocabulary = list(np.array(vocabulary)[:, 1])
         
         with open(save_dir, 'w+') as lf:

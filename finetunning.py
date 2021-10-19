@@ -17,6 +17,8 @@ import os
 import pickle
 from tqdm import tqdm
 
+import re
+
 class Mydataset(Dataset):
     def __init__(self, encoder_input, decoder_input, labels, len):
         self.encoder_input = encoder_input
@@ -182,6 +184,15 @@ def bind_model(model,types, parser):
     # nsml에서 지정한 함수에 접근할 수 있도록 하는 함수입니다.
     nsml.bind(save=save, load=load, infer=infer)
 
+def delete_char(texts):
+    preprocessed_text = []
+    proc = re.compile(r"[^가-힣a-zA-Z!?@#$%^&*<>()_ +]")
+    for text in tqdm(texts):
+        text = proc.sub("", text).strip()
+        if text:
+            preprocessed_text.append(text)
+    return preprocessed_text
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='nia_test')
     parser.add_argument('--mode', type=str, default='train')
@@ -204,6 +215,8 @@ if __name__ == '__main__':
     train_json_list = preprocessor.make_dataset_list(train_path_list)
     train_data= preprocessor.make_set_as_df(train_json_list)
     encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
+
+    encoder_input_train = delete_char(encoder_input_train)
     print('-'*10, 'Load data complete', '-'*10,)
 
     #################
@@ -214,14 +227,14 @@ if __name__ == '__main__':
     special_tokens_dict = {'additional_special_tokens': ['#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
     tokenizer.add_special_tokens(special_tokens_dict)
 
-    nsml.load(checkpoint='0', session='nia2012/dialogue/219')
+    #nsml.load(checkpoint='0', session='nia2012/dialogue/219')
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
     config = BartConfig()
     generate_model = BartForConditionalGeneration(config=config)
 
     bind_model(model=generate_model, types='model', parser=args)
-    nsml.load(checkpoint='0', session='nia2012/dialogue/169')
+    #nsml.load(checkpoint='0', session='nia2012/dialogue/169')
 
     if args.pause :
         nsml.paused(scope=locals())
@@ -235,9 +248,9 @@ if __name__ == '__main__':
         tokenized_encoder_inputs = tokenizer(list(encoder_input_train), return_tensors="pt", padding=True, 
                             add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
         tokenized_decoder_inputs = tokenizer(list(decoder_input_train), return_tensors="pt", padding=True, 
-                            add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
+                            add_special_tokens=True, truncation=True, max_length=100, return_token_type_ids=False,)
         tokenized_decoder_ouputs = tokenizer(list(decoder_output_train), return_tensors="pt", padding=True, 
-                            add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
+                            add_special_tokens=True, truncation=True, max_length=100, return_token_type_ids=False,)
         
         encoder_inputs_dataset = Mydataset(tokenized_encoder_inputs, tokenized_decoder_inputs, tokenized_decoder_ouputs, len(encoder_input_train))
 
@@ -274,6 +287,7 @@ if __name__ == '__main__':
         print('-'*10, 'Make trainer complete', '-'*10,)
     
         #DONOTCHANGE (You can decide how often you want to save the model)
-        for epoch in range(2):
+        for epoch in range(30):
             trainer.train()
-            nsml.save(epoch)
+            if epoch > 10:
+                nsml.save(epoch)

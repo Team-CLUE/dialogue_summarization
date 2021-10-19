@@ -8,7 +8,7 @@ import json
 
 import torch
 from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizer
+from transformers import BertTokenizer, AutoTokenizer
 from transformers import BartForConditionalGeneration, BartConfig
 from transformers import Trainer, TrainingArguments, Seq2SeqTrainingArguments, Seq2SeqTrainer
 
@@ -18,21 +18,12 @@ import pickle
 from tqdm import tqdm
 
 class Mydataset(Dataset):
-    def __init__(self, encoder_input, decoder_input, labels, len):
+    def __init__(self, encoder_input, len):
         self.encoder_input = encoder_input
-        self.decoder_input = decoder_input
-        self.labels = labels
         self.len = len
 
     def __getitem__(self, idx):
         item = {key: val[idx].clone().detach() for key, val in self.encoder_input.items()}
-        item2 = {key: val[idx].clone().detach() for key, val in self.decoder_input.items()}
-        item2['decoder_input_ids'] = item2['input_ids']
-        item2['decoder_attention_mask'] = item2['attention_mask']
-        item2.pop('input_ids')
-        item2.pop('attention_mask')
-        item.update(item2)
-        item['labels'] = self.labels['input_ids'][idx]
         return item
     
     def __len__(self):
@@ -172,10 +163,14 @@ def bind_model(model,types, parser):
         print(tokenized_encoder_inputs['input_ids'][0:10])
 
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        dataset = Mydataset(tokenized_encoder_inputs, len(encoder_input_test))
+        dataloader = DataLoader(dataset, batch_size=8)
         summary = []
-        for idx in tqdm(range(len(tokenized_encoder_inputs['input_ids']))):
-            generated_ids = generate_model.generate(input_ids=[tokenized_encoder_inputs['input_ids'][idx].to(device)], max_length=100, num_beams=2)
-            summary.append(tokenizer.decode(generated_ids, skip_special_tokens=True))
+        with torch.no_grad():
+            for item in tqdm(dataloader):
+                generated_ids = generate_model.generate(input_ids=item['input_ids'].to(device), max_length=50, num_beams=2)
+                for ids in generated_ids:
+                    summary.append(tokenizer.decode(ids, skip_special_tokens=True))
 
         # DONOTCHANGE: They are reserved for nsml
         # 리턴 결과는 [(확률, 0 or 1)] 의 형태로 보내야만 리더보드에 올릴 수 있습니다.
@@ -198,18 +193,24 @@ if __name__ == '__main__':
     #################
     # Load tokenizer & model
     ################# 
+    print(torch.__version__)
     print('-'*10, 'Load tokenizer & model', '-'*10,)
     tokenizer = None
     bind_model(model=tokenizer, types='tokenizer', parser=args)
+    #tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
+    #special_tokens_dict = {'additional_special_tokens': ['#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
+    #tokenizer.add_special_tokens(special_tokens_dict)
+    nsml.load(checkpoint='0', session='nia2012/dialogue/274')
 
-    nsml.load(checkpoint='0', session='nia2012/dialogue/219')
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
     config = BartConfig()
     generate_model = BartForConditionalGeneration(config=config)
 
     bind_model(model=generate_model, types='model', parser=args)
-    nsml.load(checkpoint='14', session='nia2012/dialogue/171')
+    nsml.load(checkpoint='13', session='nia2012/dialogue/171')
+    generate_model.pad_token_id=0
+    generate_model.to('cuda:0')
 
     if args.pause :
         nsml.paused(scope=locals())
