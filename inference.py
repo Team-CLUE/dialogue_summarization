@@ -18,12 +18,14 @@ import pickle
 from tqdm import tqdm
 
 class Mydataset(Dataset):
-    def __init__(self, encoder_input, len):
+    def __init__(self, encoder_input, test_id, len):
         self.encoder_input = encoder_input
+        self.test_id = test_id
         self.len = len
 
     def __getitem__(self, idx):
         item = {key: val[idx].clone().detach() for key, val in self.encoder_input.items()}
+        item['ID'] = self.test_id[idx]
         return item
     
     def __len__(self):
@@ -90,20 +92,20 @@ class Preprocess:
     def make_model_input(dataset, is_valid=False, is_test = False):
         if is_test:
             encoder_input = dataset['dialogue']
-            decoder_input = ['sostoken'] * len(dataset)
+            decoder_input = ['</s>'] * len(dataset)
             return encoder_input, decoder_input
 
         elif is_valid:
             encoder_input = dataset['dialogue']
-            decoder_input = ['sostoken'] * len(dataset)
-            decoder_output = dataset['summary'].apply(lambda x: str(x) + ' [SEP] ')
+            decoder_input = ['</s>'] * len(dataset)
+            decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : ' [CLS] ' + str(x))
-            decoder_output = dataset['summary'].apply(lambda x : str(x) + ' [SEP] ')
+            decoder_input = dataset['summary'].apply(lambda x : '</s><s>' + str(x))
+            decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
 
@@ -154,6 +156,7 @@ def bind_model(model,types, parser):
 
         test_json_list = preprocessor.make_dataset_list(test_path_list)
         test_data = preprocessor.make_set_as_df(test_json_list)
+        test_id = test_data['dialogueID']
 
         #print(f'test_data:\n{test_data["dialogue"]}')
         encoder_input_test, decoder_input_test = preprocessor.make_model_input(test_data, is_test= True)
@@ -163,11 +166,13 @@ def bind_model(model,types, parser):
         print(tokenized_encoder_inputs['input_ids'][0:10])
 
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        dataset = Mydataset(tokenized_encoder_inputs, len(encoder_input_test))
-        dataloader = DataLoader(dataset, batch_size=8)
+        dataset = Mydataset(tokenized_encoder_inputs, test_id, len(encoder_input_test))
+        dataloader = DataLoader(dataset, batch_size=32)
         summary = []
+        text_ids = []
         with torch.no_grad():
             for item in tqdm(dataloader):
+                text_ids.extend(item['ID'])
                 generated_ids = generate_model.generate(input_ids=item['input_ids'].to(device), max_length=50, num_beams=2)
                 for ids in generated_ids:
                     summary.append(tokenizer.decode(ids, skip_special_tokens=True))
@@ -175,8 +180,8 @@ def bind_model(model,types, parser):
         # DONOTCHANGE: They are reserved for nsml
         # 리턴 결과는 [(확률, 0 or 1)] 의 형태로 보내야만 리더보드에 올릴 수 있습니다.
         # return list(zip(pred.flatten(), clipped.flatten()))
-        prob = [1]*len(encoder_input_test)
-        return list(zip(prob, summary))
+        
+        return list(zip(text_ids, summary))
 
     # DONOTCHANGE: They are reserved for nsml
     # nsml에서 지정한 함수에 접근할 수 있도록 하는 함수입니다.
@@ -195,20 +200,24 @@ if __name__ == '__main__':
     ################# 
     print(torch.__version__)
     print('-'*10, 'Load tokenizer & model', '-'*10,)
-    tokenizer = None
-    bind_model(model=tokenizer, types='tokenizer', parser=args)
-    #tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
-    #special_tokens_dict = {'additional_special_tokens': ['#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
-    #tokenizer.add_special_tokens(special_tokens_dict)
-    nsml.load(checkpoint='0', session='nia2012/dialogue/274')
+    #tokenizer = None
+    #bind_model(model=tokenizer, types='tokenizer', parser=args)
+    tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
+    special_tokens_dict = {'additional_special_tokens': ['#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
+    tokenizer.add_special_tokens(special_tokens_dict)
+    #nsml.load(checkpoint='0', session='nia2012/dialogue/274')
 
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
-    config = BartConfig()
+    config = BartConfig()#.from_pretrained('gogamza/kobart-summarization')
+    config.pad_token_id=3
+    config.decoder_start_token_id=1
+    config.eos_token_id=1
+    config.bos_token_id=0
     generate_model = BartForConditionalGeneration(config=config)
 
     bind_model(model=generate_model, types='model', parser=args)
-    nsml.load(checkpoint='13', session='nia2012/dialogue/171')
+    nsml.load(checkpoint='29', session='nia2012/dialogue/271')
     generate_model.pad_token_id=0
     generate_model.to('cuda:0')
 

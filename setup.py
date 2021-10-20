@@ -7,6 +7,7 @@ setup(
     install_requires=[
         'tokenizers==0.10.3',
         'transformers==4.11.3',
-        'torch==1.7.1'
+        'torch==1.7.1',
+        'soynlp'
     ]
 )

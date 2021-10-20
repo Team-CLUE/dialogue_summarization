@@ -7,17 +7,16 @@ from glob import glob
 import json
 
 import torch
-from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizer, AutoTokenizer
+from torch.utils.data import Dataset
+from transformers import AutoTokenizer
 from transformers import BartForConditionalGeneration, BartConfig
-from transformers import Trainer, TrainingArguments, Seq2SeqTrainingArguments, Seq2SeqTrainer
+from transformers import Seq2SeqTrainingArguments, Seq2SeqTrainer
 
-from typing import Dict, List, Optional
 import os
-import pickle
 from tqdm import tqdm
 
 import re
+from soynlp.normalizer import *
 
 class Mydataset(Dataset):
     def __init__(self, encoder_input, decoder_input, labels, len):
@@ -58,15 +57,31 @@ class Preprocess:
         if is_train:
             train_dialogue = []
             train_dialogue_id = []
+            train_dialogue_type = []
             train_summary = []
             for topic in train_set:
                 for data in topic['data']:
+                    train_dialogue_type.append(data['header']['dialogueInfo']['topic'])
                     train_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
-                    train_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
                     train_summary.append(data['body']['summary'])
-
+                    
+                    prev_pid = data['body']['dialogue'][0]['participantID']
+                    utter = f'<{prev_pid}>'
+                    
+                    for dialogue in data['body']['dialogue']:
+                        pid = dialogue['participantID']
+                        next_utter = dialogue['utterance']
+                        if pid != prev_pid:
+                            next_utter = f'</{prev_pid}> <{pid}>' + next_utter 
+                        utter += next_utter
+                        prev_pid = pid
+                    utter += f'</{pid}>'
+                    train_dialogue.append(utter)
+                    #train_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
+                
             train_data = pd.DataFrame(
                 {
+                    'Category': train_dialogue_type,
                     'dialogueID': train_dialogue_id,
                     'dialogue': train_dialogue,
                     'summary': train_summary
@@ -80,7 +95,21 @@ class Preprocess:
             for topic in train_set:
                 for data in topic['data']:
                     test_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
-                    test_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
+                    
+                    prev_pid = data['body']['dialogue'][0]['participantID']
+                    utter = f'<{prev_pid}>'
+                    
+                    for dialogue in data['body']['dialogue']:
+                        pid = dialogue['participantID']
+                        next_utter = dialogue['utterance']
+                        if pid != prev_pid:
+                            next_utter = f'</{prev_pid}> <{pid}>' + next_utter 
+                        utter += next_utter
+                        prev_pid = pid
+                    utter += f'</{pid}>'
+                    test_dialogue.append(utter)
+                            
+                    #test_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
 
             test_data = pd.DataFrame(
                 {
@@ -98,22 +127,45 @@ class Preprocess:
         return train_data, val_data
 
     @staticmethod
-    def make_model_input(dataset, is_valid=False, is_test = False):
+    def make_tokenizer_input(dataset, is_valid=False, is_test = False):
         if is_test:
             encoder_input = dataset['dialogue']
-            decoder_input = ['<s>'] * len(dataset)
+            decoder_input = ['</s>'] * len(dataset)
             return encoder_input, decoder_input
 
         elif is_valid:
             encoder_input = dataset['dialogue']
-            decoder_input = ['<s>'] * len(dataset)
+            decoder_input = ['</s>'] * len(dataset)
+            #decoder_output = dataset['summary'].apply(lambda x: str(x) + ' [SEP] ')
             decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : '<s>' + str(x))
+            #decoder_input = dataset['summary'].apply(lambda x : ' [CLS] ' + str(x) + ' [SEP] ')
+            decoder_input = dataset['summary'].apply(lambda x : '</s><s>' + str(x))
+            decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
+
+            return list(encoder_input) + list(decoder_input), decoder_output
+        
+    @staticmethod
+    def make_model_input(dataset, is_valid=False, is_test = False):
+        if is_test:
+            encoder_input = dataset['dialogue']
+            decoder_input = ['</s>'] * len(dataset)
+            return encoder_input, decoder_input
+
+        elif is_valid:
+            encoder_input = dataset['dialogue']
+            decoder_input = ['</s>'] * len(dataset)
+            decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
+
+            return encoder_input, decoder_input, decoder_output
+
+        else:
+            encoder_input = dataset['dialogue']
+            decoder_input = dataset['summary'].apply(lambda x : '</s><s>' + str(x))
             decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
@@ -193,6 +245,14 @@ def delete_char(texts):
             preprocessed_text.append(text)
     return preprocessed_text
 
+def remove_repeat_char(texts):
+    preprocessed_text = []
+    for text in tqdm(texts):
+        text = repeat_normalize(text, num_repeats=2).strip()
+        if text:
+            preprocessed_text.append(text)
+    return preprocessed_text
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='nia_test')
     parser.add_argument('--mode', type=str, default='train')
@@ -217,6 +277,7 @@ if __name__ == '__main__':
     encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
 
     encoder_input_train = delete_char(encoder_input_train)
+    encoder_input_train = remove_repeat_char(encoder_input_train)
     print('-'*10, 'Load data complete', '-'*10,)
 
     #################
@@ -224,13 +285,15 @@ if __name__ == '__main__':
     ################# 
     print('-'*10, 'Load tokenizer & model', '-'*10,)
     tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
-    special_tokens_dict = {'additional_special_tokens': ['#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
+    special_tokens_dict = {'additional_special_tokens': ['#@URL#','#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#', 
+                            '<P01>', '</P01>', '<P02>', '</P02>', '<P03>', '</P03>', '<P04>', '</P04>', '<P05>', '</P05>', '<P06>', '</P06>',
+                            '<P07>', '</P07>', '<P08>', '</P08>']}
     tokenizer.add_special_tokens(special_tokens_dict)
 
     #nsml.load(checkpoint='0', session='nia2012/dialogue/219')
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
-    config = BartConfig()
+    config = BartConfig().from_pretrained('gogamza/kobart-summarization')
     generate_model = BartForConditionalGeneration(config=config)
 
     bind_model(model=generate_model, types='model', parser=args)
@@ -248,18 +311,18 @@ if __name__ == '__main__':
         tokenized_encoder_inputs = tokenizer(list(encoder_input_train), return_tensors="pt", padding=True, 
                             add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
         tokenized_decoder_inputs = tokenizer(list(decoder_input_train), return_tensors="pt", padding=True, 
-                            add_special_tokens=True, truncation=True, max_length=100, return_token_type_ids=False,)
+                            add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
         tokenized_decoder_ouputs = tokenizer(list(decoder_output_train), return_tensors="pt", padding=True, 
-                            add_special_tokens=True, truncation=True, max_length=100, return_token_type_ids=False,)
+                            add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
         
         encoder_inputs_dataset = Mydataset(tokenized_encoder_inputs, tokenized_decoder_inputs, tokenized_decoder_ouputs, len(encoder_input_train))
 
         val_tokenized_encoder_inputs = tokenizer(list(encoder_input_train)[:10], return_tensors="pt", padding=True, 
                             add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
         val_tokenized_decoder_inputs = tokenizer(list(decoder_input_train)[:10], return_tensors="pt", padding=True, 
-                            add_special_tokens=True, truncation=True, max_length=100, return_token_type_ids=False,)
+                            add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
         val_tokenized_decoder_ouputs = tokenizer(list(decoder_output_train)[:10], return_tensors="pt", padding=True, 
-                            add_special_tokens=True, truncation=True, max_length=100, return_token_type_ids=False,)
+                            add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
         
         val_encoder_inputs_dataset = Mydataset(val_tokenized_encoder_inputs, val_tokenized_decoder_inputs, val_tokenized_decoder_ouputs, 10)
 
@@ -298,5 +361,4 @@ if __name__ == '__main__':
         #DONOTCHANGE (You can decide how often you want to save the model)
         for epoch in range(30):
             trainer.train()
-            if epoch > 10:
-                nsml.save(epoch)
+            nsml.save(epoch)
