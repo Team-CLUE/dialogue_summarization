@@ -18,17 +18,15 @@ import pickle
 import re
 from tqdm import tqdm
 
-from rouge import Rouge
-
 class Mydataset(Dataset):
-    def __init__(self, encoder_input, test_id, len):
+    def __init__(self, encoder_input, label, len):
         self.encoder_input = encoder_input
-        self.test_id = test_id
+        self.label = label
         self.len = len
 
     def __getitem__(self, idx):
         item = {key: val[idx].clone().detach() for key, val in self.encoder_input.items()}
-        item['ID'] = self.test_id[idx]
+        item['labels'] = self.label[idx]
         return item
     
     def __len__(self):
@@ -96,13 +94,13 @@ class Preprocess:
         if is_test:
             encoder_input = dataset['dialogue']
             #decoder_input = ['</s>'] * len(dataset)
-            decoder_input = ['<usr>'] * len(dataset)
+            decoder_input = ['<s>'] * len(dataset)
             return encoder_input, decoder_input
 
         elif is_valid:
             encoder_input = dataset['dialogue']
             #decoder_input = ['</s>'] * len(dataset)
-            decoder_input = ['<usr>'] * len(dataset)
+            decoder_input = ['<s>'] * len(dataset)
             decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
@@ -119,31 +117,37 @@ def train_data_loader(root_path) :
     pathes = glob(train_path)
     return pathes
 
-def bind_model(model, tokenizer, types, parser):
+def bind_model(model,types, parser):
     # 학습한 모델을 저장하는 함수입니다.
     def save(dir_name, *parser):
         # directory
         os.makedirs(dir_name, exist_ok=True)
         save_dir = os.path.join(dir_name, 'model')
         model.save_pretrained(save_dir)
-
+        
         print("저장 완료!")
 
     # 저장한 모델을 불러올 수 있는 함수입니다.
     def load(dir_name, *parser):      
-        #global generate_model
-        print(model)
-        save_dir = os.path.join(dir_name, 'model/pytorch_model.bin')
-        state_dict = torch.load(save_dir) 
-        model.load_state_dict(state_dict)
-        #model.from_pretrained(save_dir)
-        print("model 로딩 완료!")
+        if types == 'tokenizer':
+            global tokenizer 
+            save_dir = os.path.join(dir_name, 'vocab.txt')            
+            tokenizer = BertTokenizer(
+                vocab_file = save_dir,
+                do_basic_tokenize=False,
+            )
+            print("tokenizer 로딩 완료!")
+        else:
+            global generate_model
+            save_dir = os.path.join(dir_name, 'model')
+            generate_model.from_pretrained(save_dir)
+            print("model 로딩 완료!")
 
     def infer(test_path, **kwparser):
-        #global tokenizer
-        #global generate_model
-        #print(tokenizer)
-        #print(generate_model)
+        global tokenizer
+        global generate_model
+        print(tokenizer)
+        print(generate_model)
 
         preprocessor = Preprocess()
 
@@ -166,28 +170,21 @@ def bind_model(model, tokenizer, types, parser):
         print(tokenized_encoder_inputs['input_ids'][0:10])
 
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        
         dataset = Mydataset(tokenized_encoder_inputs, test_id, len(encoder_input_test))
-        
         dataloader = DataLoader(dataset, batch_size=128)
-        
         summary = []
         text_ids = []
         with torch.no_grad():
             for item in tqdm(dataloader):
                 text_ids.extend(item['ID'])
-                generated_ids = generate_model.generate(input_ids=item['input_ids'].to(device), 
-                                no_repeat_ngram_size=2, 
-                                early_stopping=True,
-                                max_length=50, 
-                                num_beams=5,
-                                num_return_sequences = 2,
-                            )  
-                # beam search 후보들 concat
-                for idx in range(0, len(generated_ids), 2):
-                    result1 = tokenizer.decode(generated_ids[idx], skip_special_tokens=True)
-                    result2 = tokenizer.decode(generated_ids[idx+1], skip_special_tokens=True)
-                summary.append(result1 + ' ' + result2)
+                generated_ids = generate_model.generate(input_ids=item['input_ids'].to(device), no_repeat_ngram_size=2, 
+                    early_stopping=True, max_length=50, num_beams=5)
+                for ids in generated_ids:
+                    result = tokenizer.decode(ids, skip_special_tokens=True)
+                    index = result.find('.')
+                    if index != -1:
+                        result = result[:index+1]
+                    summary.append(result)
 
         # DONOTCHANGE: They are reserved for nsml
         # 리턴 결과는 [(확률, 0 or 1)] 의 형태로 보내야만 리더보드에 올릴 수 있습니다.
@@ -216,76 +213,70 @@ if __name__ == '__main__':
     parser.add_argument('--pause', type=int, default=0)
     args = parser.parse_args()
 
+    train_path_list = train_data_loader(DATASET_PATH)
+    train_path_list.sort()
+
+    preprocessor = Preprocess()
+    #################
+    # Data Load
+    #################
+    print('-'*10, 'Load data', '-'*10,)
+    train_json_list = preprocessor.make_dataset_list(train_path_list)
+    train_data= preprocessor.make_set_as_df(train_json_list)
+    encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_model_input(train_data)
+
+    encoder_input_train = delete_char(encoder_input_train)
+    #encoder_input_train = remove_repeat_char(encoder_input_train)
+    print('-'*10, 'Load data complete', '-'*10,)
+
     #################
     # Load tokenizer & model
     ################# 
-    print(torch.__version__)
     print('-'*10, 'Load tokenizer & model', '-'*10,)
-    #tokenizer = None
-    #bind_model(model=tokenizer, types='tokenizer', parser=args)
     tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
     special_tokens_dict = {'additional_special_tokens': ['#@URL#','#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
     tokenizer.add_special_tokens(special_tokens_dict)
-    #nsml.load(checkpoint='0', session='nia2012/dialogue/274')
 
+    #nsml.load(checkpoint='0', session='nia2012/dialogue/219')
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
-    config = BartConfig().from_pretrained('gogamza/kobart-summarization')
+    tokenized_encoder_inputs = tokenizer(list(encoder_input_train), return_tensors="pt", padding=True, 
+                        add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
+
+    config = BartConfig()#.from_pretrained('gogamza/kobart-summarization')
     # config.pad_token_id=3
     # config.decoder_start_token_id=1
     # config.eos_token_id=1
     # config.bos_token_id=0
     generate_model = BartForConditionalGeneration(config=config)
-    generate_model.resize_token_embeddings(len(tokenizer))  
 
-    bind_model(model=generate_model, tokenizer=tokenizer, types='model', parser=args)
-    nsml.load(checkpoint=0, session='nia2012/dialogue/336')
+    bind_model(model=generate_model, types='model', parser=args)
+    nsml.load(checkpoint='29', session='nia2012/dialogue/271')
+    generate_model.pad_token_id=3
     generate_model.to('cuda:0')
-    
-    # score = Rouge()
-    # test = ['#@시스템#사진# #@이름#이는 매일매일이 지옥인가부다.. 번호 저장을안해서 #@이름#로 뜨네 ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ 마자 지난주에 저러더라 못살아 증말 ㅋㅋㅋㅋㅋㅋㅋ어쩌냐 진짜 결혼 잘못한 케이스같은데... 대충만 들었어도 엉망이었잖아 응... 어린나이에 너무속상하다 그니까ㅠㅠ<usr>',
-    #    '난 악몽꿨던거 정확히 기억은 안나는데 응응 누가 날 죽이려고 그랬어 나는 계속 도망다니고 헐... 너도 스트레스 많이 받아서 그런가봐 응응 그래서 내가 살려달라고 그랬더니 그 사람이 이거 꿈이야 헐 그게 더 무서워<usr>',
-    #    '이겜 강아지 고기랑 사료만 먹는듯? 응 글타데 여러마리일수록 ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ 많이먹는데 강아지키우면서 책임감이 생겻구만 그런 강아지를 너는 뺏어왓지 ㅋㅋㅋㅋㅋ 내가 새로운주인이다 그럼 안돼<usr>',
-    #    '토익점수 왜케안나왔지 듣기를 올려봐 그니까 듣기를 더해야겟어 웅 열심히해야하지 독해는 올랐는데 듣기가 떨어지네 요번 파트가 점수를 엄청깎았다는데 그래서그런가봐 점만 올리자!!!!!!!!!!!!!!!!!!!! 듣기 점 올려야되서 열심히해야하지!!!!!!!!!!!!']
-
-    # labels = ['대충만 들었는데도 엉망이었다고 어린 나이에 결혼을 잘 못한 케이스 같아서 너무 속상하다고 한다.',
-    #    '악몽을 꾼 것이 정확히 기억이 나진 않지만 계속 도망다녔다고 하며 스트레스를 많이 받아서라고 한다.',
-    #    '자신들이 하고 있는 강아지를 키우며 책임감을 키우는 게임에 대해 대화한다.']
-
-
-    # tokenized = tokenizer(test, return_tensors="pt", add_special_tokens=True, padding=True, truncation=True, max_length=256, return_token_type_ids=False,)
-    
-    # dataset = Mydataset(tokenized, [1,2,3,4] ,len(test))
-    # dataloader = DataLoader(dataset, batch_size=128)
-    
-    # summary = []
-    # text_ids = []
-    # with torch.no_grad():
-    #     for item in tqdm(dataloader):
-    #         text_ids.extend(item['ID'])
-    #         generated_ids = generate_model.generate(input_ids=item['input_ids'].to('cuda:0'), 
-    #                         no_repeat_ngram_size=2, 
-    #                         early_stopping=True, 
-    #                         max_length=50, 
-    #                         num_beams=5,
-    #                     )
-    #         for ids in generated_ids:
-    #             result = tokenizer.decode(ids, skip_special_tokens=True)
-    #             index = result.find('.')
-    #             if index != -1:
-    #                 result = result[:index+1]
-    #             summary.append(result)
-    
-    # for idx, te in enumerate(summary):
-    #     print(idx, te)
 
     if args.pause :
         nsml.paused(scope=locals())
 
     if args.mode == 'train' :
-        nsml.save(0)
-            
-
-
-
-            
+        device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        dataset = Mydataset(tokenized_encoder_inputs, decoder_output_train, len(encoder_input_train))
+        dataloader = DataLoader(dataset, batch_size=30)
+        summary = []
+        text_ids = []
+        count = 0
+        with torch.no_grad():
+            for item in tqdm(dataloader):
+                generated_ids = generate_model.generate(input_ids=item['input_ids'].to(device), no_repeat_ngram_size=2, 
+                    early_stopping=True, max_length=50, num_beams=5)
+                for di, sum_ids, label in zip(item['input_ids'], generated_ids, item['labels']):
+                    dialogue = tokenizer.decode(di, skip_special_tokens=True)
+                    result = tokenizer.decode(sum_ids, skip_special_tokens=True)
+                    print('tokenids:\t', tokenizer.convert_ids_to_tokens(di))
+                    print('Di:\t', dialogue)
+                    print('sumids:\t', tokenizer.convert_ids_to_tokens(sum_ids))
+                    print('sumids:\t', sum_ids)
+                    print('Summary:\t', result)
+                    print('GT:\t', label)
+                    print('-'*100)
+                break

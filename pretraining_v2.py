@@ -122,7 +122,7 @@ class Preprocess:
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : '<s>' + str(x))
+            decoder_input = dataset['summary'].apply(lambda x : '<usr>' + str(x))
             decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
 
             return list(encoder_input) + list(decoder_input), decoder_output
@@ -164,7 +164,7 @@ def bind_model(model, parser):
 
 def delete_char(texts):
     preprocessed_text = []
-    proc = re.compile(r"[^가-힣a-zA-Z!?@#$%^&*<>()_ +]")
+    proc = re.compile(r"[^가-힣a-zA-Z/!?@#$%^&*<>()_ +]")
     for text in tqdm(texts):
         text = proc.sub("", text).strip()
         if text:

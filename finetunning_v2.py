@@ -39,6 +39,7 @@ class Mydataset(Dataset):
     def __len__(self):
         return self.len
 
+
 class Preprocess:
 
     @staticmethod
@@ -64,20 +65,7 @@ class Preprocess:
                     train_dialogue_type.append(data['header']['dialogueInfo']['topic'])
                     train_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
                     train_summary.append(data['body']['summary'])
-                    
-                    prev_pid = data['body']['dialogue'][0]['participantID']
-                    utter = f'<{prev_pid}>'
-                    
-                    for dialogue in data['body']['dialogue']:
-                        pid = dialogue['participantID']
-                        next_utter = dialogue['utterance']
-                        if pid != prev_pid:
-                            next_utter = f'</{prev_pid}> <{pid}>' + next_utter 
-                        utter += next_utter
-                        prev_pid = pid
-                    utter += f'</{pid}>'
-                    train_dialogue.append(utter)
-                    #train_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
+                    train_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
                 
             train_data = pd.DataFrame(
                 {
@@ -94,22 +82,8 @@ class Preprocess:
             test_dialogue_id = []
             for topic in train_set:
                 for data in topic['data']:
-                    test_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
-                    
-                    prev_pid = data['body']['dialogue'][0]['participantID']
-                    utter = f'<{prev_pid}>'
-                    
-                    for dialogue in data['body']['dialogue']:
-                        pid = dialogue['participantID']
-                        next_utter = dialogue['utterance']
-                        if pid != prev_pid:
-                            next_utter = f'</{prev_pid}> <{pid}>' + next_utter 
-                        utter += next_utter
-                        prev_pid = pid
-                    utter += f'</{pid}>'
-                    test_dialogue.append(utter)
-                            
-                    #test_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
+                    test_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])                            
+                    test_dialogue.append(' '.join([dialogue['utterance'] for dialogue in data['body']['dialogue']]))
 
             test_data = pd.DataFrame(
                 {
@@ -130,12 +104,12 @@ class Preprocess:
     def make_tokenizer_input(dataset, is_valid=False, is_test = False):
         if is_test:
             encoder_input = dataset['dialogue']
-            decoder_input = ['</s>'] * len(dataset)
+            decoder_input = ['<usr>'] * len(dataset)
             return encoder_input, decoder_input
 
         elif is_valid:
             encoder_input = dataset['dialogue']
-            decoder_input = ['</s>'] * len(dataset)
+            decoder_input = ['<usr>'] * len(dataset)
             #decoder_output = dataset['summary'].apply(lambda x: str(x) + ' [SEP] ')
             decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
 
@@ -144,7 +118,7 @@ class Preprocess:
         else:
             encoder_input = dataset['dialogue']
             #decoder_input = dataset['summary'].apply(lambda x : ' [CLS] ' + str(x) + ' [SEP] ')
-            decoder_input = dataset['summary'].apply(lambda x : '</s><s>' + str(x))
+            decoder_input = dataset['summary'].apply(lambda x : '<usr>' + str(x))
             decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
 
             return list(encoder_input) + list(decoder_input), decoder_output
@@ -153,19 +127,19 @@ class Preprocess:
     def make_model_input(dataset, is_valid=False, is_test = False):
         if is_test:
             encoder_input = dataset['dialogue']
-            decoder_input = ['</s>'] * len(dataset)
+            decoder_input = ['<usr>'] * len(dataset)
             return encoder_input, decoder_input
 
         elif is_valid:
             encoder_input = dataset['dialogue']
-            decoder_input = ['</s>'] * len(dataset)
+            decoder_input = ['<usr>'] * len(dataset)
             decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : '</s><s>' + str(x))
+            decoder_input = dataset['summary'].apply(lambda x : '<usr>' + str(x))
             decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
@@ -213,11 +187,10 @@ def bind_model(model,types, parser):
         test_json_list = preprocessor.make_dataset_list(test_path_list)
         test_data = preprocessor.make_set_as_df(test_json_list)
 
-        #print(f'test_data:\n{test_data["dialogue"]}')
+        print(f'test_data:\n{test_data["dialogue"]}')
         encoder_input_test, decoder_input_test = preprocessor.make_model_input(test_data, is_test= True)
 
         tokenized_encoder_inputs = tokenizer(list(encoder_input_test), return_tensors="pt", add_special_tokens=True, padding=True, truncation=True, max_length=256, return_token_type_ids=False,)
-        #tokenized_decoder_inputs = tokenizer.tokenize(decoder_input_test, return_tensors="pt", padding=True, add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
         print(tokenized_encoder_inputs['input_ids'][0:10])
 
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -237,8 +210,8 @@ def bind_model(model,types, parser):
     nsml.bind(save=save, load=load, infer=infer)
 
 def delete_char(texts):
-    preprocessed_text = []
-    proc = re.compile(r"[^가-힣a-zA-Z!?@#$%^&*<>()_ +]")
+    preprocessed_text = [] 
+    proc = re.compile(r"[^가-힣a-zA-Z/!?@#$%^&*<>()_ +]")
     for text in tqdm(texts):
         text = proc.sub("", text).strip()
         if text:
@@ -260,10 +233,7 @@ if __name__ == '__main__':
     parser.add_argument('--iteration', type=str, default='0')
     parser.add_argument('--pause', type=int, default=0)
     args = parser.parse_args()
-
-    if args.pause :
-        nsml.paused(scope=locals())
-
+    
     train_path_list = train_data_loader(DATASET_PATH)
     train_path_list.sort()
 
@@ -285,19 +255,17 @@ if __name__ == '__main__':
     ################# 
     print('-'*10, 'Load tokenizer & model', '-'*10,)
     tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
-    special_tokens_dict = {'additional_special_tokens': ['#@URL#','#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#', 
-                            '<P01>', '</P01>', '<P02>', '</P02>', '<P03>', '</P03>', '<P04>', '</P04>', '<P05>', '</P05>', '<P06>', '</P06>',
-                            '<P07>', '</P07>', '<P08>', '</P08>']}
+    special_tokens_dict = {'additional_special_tokens': ['#@URL#','#@이름#','#@계정#','#@신원#','#@전번#',
+                '#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#', '#@시스템#사진', '#@시스템#검색',  '#@시스템#지도#', '#@시스템#기타#', '#@시스템#파일#',
+                '#@시스템#동영상#', '#@시스템#송금#', '#@시스템#삭제#']}
     tokenizer.add_special_tokens(special_tokens_dict)
 
-    #nsml.load(checkpoint='0', session='nia2012/dialogue/219')
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
     config = BartConfig().from_pretrained('gogamza/kobart-summarization')
     generate_model = BartForConditionalGeneration(config=config)
 
     bind_model(model=generate_model, types='model', parser=args)
-    #nsml.load(checkpoint='0', session='nia2012/dialogue/169')
 
     if args.pause :
         nsml.paused(scope=locals())
@@ -325,7 +293,7 @@ if __name__ == '__main__':
                             add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
         
         val_encoder_inputs_dataset = Mydataset(val_tokenized_encoder_inputs, val_tokenized_decoder_inputs, val_tokenized_decoder_ouputs, 10)
-
+        
         print('-'*10, 'Make dataset complete', '-'*10,)
 
         #################
@@ -338,10 +306,10 @@ if __name__ == '__main__':
         training_args = Seq2SeqTrainingArguments(
             output_dir='./',
             overwrite_output_dir=True,
-            num_train_epochs=1,
+            num_train_epochs=50,
             per_device_train_batch_size=32,
             per_device_eval_batch_size=32,
-            gradient_accumulation_steps=10,
+            gradient_accumulation_steps=5,
             evaluation_strategy = 'epoch',
             save_strategy = 'epoch',
             save_total_limit=1,
@@ -359,6 +327,21 @@ if __name__ == '__main__':
         print('-'*10, 'Make trainer complete', '-'*10,)
     
         #DONOTCHANGE (You can decide how often you want to save the model)
-        for epoch in range(30):
+        for epoch in range(1):
             trainer.train()
+            device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+            generated_ids = generate_model.generate(input_ids=val_encoder_inputs_dataset[:10]['input_ids'].to(device), 
+                    no_repeat_ngram_size=2, early_stopping=True, max_length=50, num_beams=5)
+            for di, sum_ids, label in zip(val_encoder_inputs_dataset[:10]['input_ids'], generated_ids, val_encoder_inputs_dataset[:10]['labels']):
+                dialogue = tokenizer.decode(di, skip_special_tokens=True)
+                result = tokenizer.decode(sum_ids, skip_special_tokens=True)
+                labeled = tokenizer.decode(label, skip_special_tokens=True)
+                print('tokenids:\t', tokenizer.convert_ids_to_tokens(di))
+                print('Di:\t', dialogue)
+                print('sumids:\t', tokenizer.convert_ids_to_tokens(sum_ids))
+                print('sumids:\t', sum_ids)
+                print('Summary:\t', result)
+                print('GT:\t', labeled)
+                print('-'*100)
+
             nsml.save(epoch)
