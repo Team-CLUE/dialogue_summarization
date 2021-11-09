@@ -9,6 +9,7 @@ setup(
         'transformers==4.11.3',
         'torch==1.7.1',
         'soynlp',
-        'rouge'
+        'wandb',
+        'rouge',
     ]
 )

@@ -9,7 +9,7 @@ from transformers import Seq2SeqTrainingArguments, Seq2SeqTrainer
 def prepare_for_pretraining(
         tokenizer: AutoTokenizer, 
         encoder_input_train: List[str]
-        ):#-> Union(LineByLineTextDataset, LineByLineTextDataset, DataCollatorForLanguageModeling):
+        )-> Tuple[LineByLineTextDataset, LineByLineTextDataset, DataCollatorForLanguageModeling]:
     '''
         Arguments:
             tokenizer: AutoTokenizer 
@@ -18,7 +18,7 @@ def prepare_for_pretraining(
                 모델 학습에 사용될 string list
 
         Return
-            Union(LineByLineTextDataset, LineByLineTextDataset, DataCollatorForLanguageModeling)
+            Tuple[LineByLineTextDataset, LineByLineTextDataset, DataCollatorForLanguageModeling]
 
         Summary:
             학습을 위한 dataset에 string을 넣어주고, masking을 위한 collector를 정의해 반환
@@ -40,7 +40,6 @@ def prepare_for_pretraining(
 
     return dataset, data_collator, eval_dataset
 
-    
 def set_trainer(
         model, 
         data_collator, 
@@ -48,7 +47,7 @@ def set_trainer(
         eval_dataset,
         epoch: int = 10, 
         batch_size: int = 16, 
-        accumalation_step: int = 1,):#->Seq2SeqTrainer:
+        accumalation_step: int = 1,)->Seq2SeqTrainer:
     '''
         Arguments:
             model:  

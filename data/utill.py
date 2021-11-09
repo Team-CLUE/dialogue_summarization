@@ -26,7 +26,7 @@ def train_data_loader(root_path:str)->List[str]:
 
 def get_data(decoder_start_token: str,
             eos_token: str,
-            train_type: str):
+            train_type: str)->Tuple[List[str], List[str], List[str]]:
     '''
         Arguments:
             decoder_start_token: str 
@@ -37,8 +37,7 @@ def get_data(decoder_start_token: str,
                 pretraining or finetuning 학습 타입 선택
 
         Return
-            Union(List[str], List[str]) or
-            Union(List[str], List[str], List[str])
+            Tuple[List[str], List[str], List[str]]
 
         Summary:
             Seq-to-Seq 모델을 학습 시키기 위해 필요한 special token들을 전처리 해주어 반환

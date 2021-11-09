@@ -18,6 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('--pause', type=int, default=0)
     parser.add_argument('--load', type=bool, default=False)
     args = parser.parse_args()
+    # os.system("wandb login auth코드")
 
     if args.pause :
         nsml.paused(scope=locals())
