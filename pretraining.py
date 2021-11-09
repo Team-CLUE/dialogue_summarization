@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import Dataset
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers import AutoTokenizer
-from transformers import BartForCausalLM, BartConfig
+from transformers import BartForConditionalGeneration, BartConfig
 from transformers import DataCollatorForLanguageModeling
 from transformers import Trainer, TrainingArguments, Seq2SeqTrainingArguments, Seq2SeqTrainer
 #from transformers import LineByLineTextDataset
@@ -84,19 +84,19 @@ class Preprocess:
     def make_model_input(dataset, is_valid=False, is_test = False):
         if is_test:
             encoder_input = dataset['dialogue']
-            decoder_input = ['<s>'] * len(dataset)
+            decoder_input = ['<usr>'] * len(dataset)
             return encoder_input, decoder_input
 
         elif is_valid:
             encoder_input = dataset['dialogue']
-            decoder_input = ['<s>'] * len(dataset)
+            decoder_input = ['<usr>'] * len(dataset)
             decoder_output = dataset['summary'].apply(lambda x: str(x) + '</s>')
 
             return encoder_input, decoder_input, decoder_output
 
         else:
             encoder_input = dataset['dialogue']
-            decoder_input = dataset['summary'].apply(lambda x : '<s>' + str(x))
+            decoder_input = dataset['summary'].apply(lambda x : '<usr>' + str(x))
             decoder_output = dataset['summary'].apply(lambda x : str(x) + '</s>')
 
             return list(encoder_input) + list(decoder_input), decoder_output
@@ -118,8 +118,12 @@ def bind_model(model, parser):
 
     # 저장한 모델을 불러올 수 있는 함수입니다.
     def load(dir_name, *parser):      
-        # tokenizer pretrained 사용
-        print("로딩 완료!")
+        #print(model)
+        save_dir = os.path.join(dir_name, 'model/pytorch_model.bin')
+        state_dict = torch.load(save_dir) 
+        model.load_state_dict(state_dict)
+        print("model 로딩 완료!")
+
 
     def infer(test_path, **kwparser):
 
@@ -141,11 +145,7 @@ class LineByLineTextDataset(Dataset):
     This will be superseded by a framework-agnostic approach soon.
     """
 
-    def __init__(self, tokenizer: PreTrainedTokenizer, data, block_size: int):
-        print(len(data))
-        print(data[:10])
-        print(data[-10:])
-        
+    def __init__(self, tokenizer: PreTrainedTokenizer, data, block_size: int):        
         batch_encoding = tokenizer(data, add_special_tokens=True, truncation=True, max_length=block_size)
         self.examples = batch_encoding["input_ids"]
         self.examples = [{"input_ids": torch.tensor(e, dtype=torch.long)} for e in self.examples]
@@ -188,13 +188,18 @@ if __name__ == '__main__':
     # Load tokenizer
     ################# 
     tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
-    special_tokens_dict = {'additional_special_tokens': ['#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
+    special_tokens_dict = {'additional_special_tokens': ['#@URL#','#@이름#','#@계정#','#@신원#','#@전번#',
+                '#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#', '#@시스템#사진', '#@시스템#검색',  '#@시스템#지도#', '#@시스템#기타#', '#@시스템#파일#',
+                '#@시스템#동영상#', '#@시스템#송금#', '#@시스템#삭제#']}
     tokenizer.add_special_tokens(special_tokens_dict)
     print('-'*10, 'Load tokenizer complete', '-'*10,)
     
-    config = BartConfig()
-    model = BartForCausalLM(config=config, max_len=256)
-    
+    config = BartConfig().from_pretrained('gogamza/kobart-summarization')
+    model = BartForConditionalGeneration(config=config)
+    model.resize_token_embeddings(len(tokenizer))  
+    bind_model(model=model, parser=args)
+    nsml.load(checkpoint=0, session='nia2012/final_dialogue/27')
+
     #################
     # Set dataset and trainer
     #################
@@ -209,11 +214,17 @@ if __name__ == '__main__':
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, mlm=True, mlm_probability=0.15
     )
+    eval_dataset = LineByLineTextDataset(
+        tokenizer=tokenizer,
+        data=encoder_input_train[:10],
+        block_size=512,
+    )
+
     # set training args
     training_args = Seq2SeqTrainingArguments(
         output_dir='./',
         overwrite_output_dir=True,
-        num_train_epochs=10,
+        num_train_epochs=20,
         per_device_train_batch_size=16,
         gradient_accumulation_steps=10,
         evaluation_strategy = 'steps',
@@ -230,7 +241,7 @@ if __name__ == '__main__':
         args=training_args,
         data_collator=data_collator,
         train_dataset=dataset,
-        eval_dataset=dataset,    
+        eval_dataset=eval_dataset,    
     )
     print('-'*10, 'Set dataset and trainer complete', '-'*10,)
 

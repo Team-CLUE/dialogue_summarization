@@ -159,9 +159,16 @@ def bind_model(model, tokenizer, types, parser):
 
         #print(f'test_data:\n{test_data["dialogue"]}')
         encoder_input_test, decoder_input_test = preprocessor.make_model_input(test_data, is_test= True)
+        
+        ######################
         encoder_input_test = delete_char(encoder_input_test)
 
-        tokenized_encoder_inputs = tokenizer(list(encoder_input_test), return_tensors="pt", add_special_tokens=True, padding=True, truncation=True, max_length=256, return_token_type_ids=False,)
+        tokenized_encoder_inputs = tokenizer(list(encoder_input_test), 
+                return_tensors="pt", 
+                add_special_tokens=True, 
+                padding=True, truncation=True, 
+                max_length=256, 
+                return_token_type_ids=False,)
         #tokenized_decoder_inputs = tokenizer.tokenize(decoder_input_test, return_tensors="pt", padding=True, add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
         print(tokenized_encoder_inputs['input_ids'][0:10])
 
@@ -177,17 +184,21 @@ def bind_model(model, tokenizer, types, parser):
             for item in tqdm(dataloader):
                 text_ids.extend(item['ID'])
                 generated_ids = generate_model.generate(input_ids=item['input_ids'].to(device), 
+                                # do_sample=True, 
+                                # max_length=50, 
+                                # top_p=0.92, #92%로 설정하고 샘플링하기
+                                # top_k=0
                                 no_repeat_ngram_size=2, 
                                 early_stopping=True,
                                 max_length=50, 
                                 num_beams=5,
-                                num_return_sequences = 2,
                             )  
-                # beam search 후보들 concat
-                for idx in range(0, len(generated_ids), 2):
-                    result1 = tokenizer.decode(generated_ids[idx], skip_special_tokens=True)
-                    result2 = tokenizer.decode(generated_ids[idx+1], skip_special_tokens=True)
-                summary.append(result1 + ' ' + result2)
+                for ids in generated_ids:
+                    result = tokenizer.decode(ids, skip_special_tokens=True)
+                    index = result.find('.')
+                    if index != -1:
+                        result = result[:index+1]
+                    summary.append(result)
 
         # DONOTCHANGE: They are reserved for nsml
         # 리턴 결과는 [(확률, 0 or 1)] 의 형태로 보내야만 리더보드에 올릴 수 있습니다.
@@ -224,22 +235,30 @@ if __name__ == '__main__':
     #tokenizer = None
     #bind_model(model=tokenizer, types='tokenizer', parser=args)
     tokenizer = AutoTokenizer.from_pretrained('gogamza/kobart-summarization')
-    special_tokens_dict = {'additional_special_tokens': ['#@URL#','#@이름#','#@계정#','#@신원#','#@전번#','#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#']}
+    special_tokens_dict = {'additional_special_tokens': ['#@URL#','#@이름#','#@계정#','#@신원#','#@전번#',
+                '#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#', '#@시스템#사진', '#@시스템#검색',  '#@시스템#지도#', '#@시스템#기타#', '#@시스템#파일#',
+                '#@시스템#동영상#', '#@시스템#송금#', '#@시스템#삭제#']}
     tokenizer.add_special_tokens(special_tokens_dict)
     #nsml.load(checkpoint='0', session='nia2012/dialogue/274')
 
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
     config = BartConfig().from_pretrained('gogamza/kobart-summarization')
-    # config.pad_token_id=3
-    # config.decoder_start_token_id=1
-    # config.eos_token_id=1
-    # config.bos_token_id=0
+    # config.d_model = 1024
+    # config.decoder_attention_heads = 16
+    # config.decoder_ffn_dim = 4096
+    # config.decoder_layers = 10
+
+    # config.encoder_attention_heads = 16
+    # config.encoder_ffn_dim = 4096
+    # config.encoder_layers = 10
+
     generate_model = BartForConditionalGeneration(config=config)
     generate_model.resize_token_embeddings(len(tokenizer))  
 
+    #%%
     bind_model(model=generate_model, tokenizer=tokenizer, types='model', parser=args)
-    nsml.load(checkpoint=0, session='nia2012/dialogue/336')
+    nsml.load(checkpoint=0, session='nia2012/final_dialogue/32')
     generate_model.to('cuda:0')
     
     # score = Rouge()

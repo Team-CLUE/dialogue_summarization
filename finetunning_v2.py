@@ -26,14 +26,14 @@ class Mydataset(Dataset):
         self.len = len
 
     def __getitem__(self, idx):
-        item = {key: val[idx].clone().detach() for key, val in self.encoder_input.items()}
-        item2 = {key: val[idx].clone().detach() for key, val in self.decoder_input.items()}
+        item = {key: val[idx].clone().detach() for key, val in self.encoder_input.items()} # item[input_ids], item[attention_mask]
+        item2 = {key: val[idx].clone().detach() for key, val in self.decoder_input.items()} # item2[input_ids], item2[attention_mask]
         item2['decoder_input_ids'] = item2['input_ids']
         item2['decoder_attention_mask'] = item2['attention_mask']
         item2.pop('input_ids')
         item2.pop('attention_mask')
-        item.update(item2)
-        item['labels'] = self.labels['input_ids'][idx]
+        item.update(item2) #item[input_ids], item[attention_mask] item[decoder_input_ids], item[decoder_attention_mask]
+        item['labels'] = self.labels['input_ids'][idx] #item[input_ids], item[attention_mask] item[decoder_input_ids], item[decoder_attention_mask], item[labels]
         return item
     
     def __len__(self):
@@ -149,7 +149,7 @@ def train_data_loader(root_path) :
     pathes = glob(train_path)
     return pathes
 
-def bind_model(model,types, parser):
+def bind_model(model, types, parser):
     # 학습한 모델을 저장하는 함수입니다.
     def save(dir_name, *parser):
         # directory
@@ -161,14 +161,11 @@ def bind_model(model,types, parser):
 
     # 저장한 모델을 불러올 수 있는 함수입니다.
     def load(dir_name, *parser):      
-        if types == 'tokenizer':
-            # pretrained 사용
-            print("tokenizer 로딩 완료!")
-        else:
-            global generate_model
-            save_dir = os.path.join(dir_name, 'model')
-            generate_model.from_pretrained(save_dir)
-            print("model 로딩 완료!")
+        #print(model)
+        save_dir = os.path.join(dir_name, 'model/pytorch_model.bin')
+        state_dict = torch.load(save_dir) 
+        model.load_state_dict(state_dict)
+        print("model 로딩 완료!")
 
     def infer(test_path, **kwparser):
         global tokenizer
@@ -233,7 +230,7 @@ if __name__ == '__main__':
     parser.add_argument('--iteration', type=str, default='0')
     parser.add_argument('--pause', type=int, default=0)
     args = parser.parse_args()
-    
+
     train_path_list = train_data_loader(DATASET_PATH)
     train_path_list.sort()
 
@@ -263,9 +260,21 @@ if __name__ == '__main__':
     print('-'*10, 'Load tokenizer & model complete', '-'*10,)
 
     config = BartConfig().from_pretrained('gogamza/kobart-summarization')
+    # config.d_model = 1024
+    # config.decoder_attention_heads = 16
+    # config.decoder_ffn_dim = 4096
+    # config.decoder_layers = 10
+
+    # config.encoder_attention_heads = 16
+    # config.encoder_ffn_dim = 4096
+    # config.encoder_layers = 10
+
     generate_model = BartForConditionalGeneration(config=config)
+    generate_model.resize_token_embeddings(len(tokenizer))  
 
     bind_model(model=generate_model, types='model', parser=args)
+    nsml.load(checkpoint=0, session='nia2012/final_dialogue/31')
+    generate_model.to('cuda:0')
 
     if args.pause :
         nsml.paused(scope=locals())
@@ -294,6 +303,7 @@ if __name__ == '__main__':
         
         val_encoder_inputs_dataset = Mydataset(val_tokenized_encoder_inputs, val_tokenized_decoder_inputs, val_tokenized_decoder_ouputs, 10)
         
+        #%%
         print('-'*10, 'Make dataset complete', '-'*10,)
 
         #################
@@ -306,10 +316,10 @@ if __name__ == '__main__':
         training_args = Seq2SeqTrainingArguments(
             output_dir='./',
             overwrite_output_dir=True,
-            num_train_epochs=50,
+            num_train_epochs=10,
             per_device_train_batch_size=32,
             per_device_eval_batch_size=32,
-            gradient_accumulation_steps=5,
+            gradient_accumulation_steps=10,
             evaluation_strategy = 'epoch',
             save_strategy = 'epoch',
             save_total_limit=1,
