@@ -58,9 +58,9 @@ if __name__ == '__main__':
     # Set dataset and trainer
     #################
     print('-'*10, 'Set Dataset and Trainer', '-'*10,)
-    dataset, data_collator, eval_dataset = prepare_for_pretraining(tokenizer, encoder_input_train)
-    trainer = set_trainer(model, data_collator, dataset, eval_dataset,
-                                batch_size=16, accumalation_step=10, epoch=30)
+    
+
+
     print('-'*10, 'Set dataset and trainer complete', '-'*10,)
 
     #################
@@ -69,6 +69,8 @@ if __name__ == '__main__':
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print('-'*10, 'Start pretraining:\t', device, '-'*10,)
     trainer.train()
+
+
     print('-'*10, 'Pretraing complete', '-'*10,)
 
     nsml.save(0)

@@ -5,6 +5,7 @@ from data.custom_dataset import LineByLineTextDataset
 from transformers import DataCollatorForLanguageModeling
 from transformers.models.auto.tokenization_auto import AutoTokenizer
 from transformers import Seq2SeqTrainingArguments, Seq2SeqTrainer
+from torch.utils.tensorboard import SummaryWriter
 
 def prepare_for_pretraining(
         tokenizer: AutoTokenizer, 
@@ -70,6 +71,7 @@ def set_trainer(
     '''
      # set training args
     training_args = Seq2SeqTrainingArguments(
+        report_to = 'tensorboard',
         output_dir='./',
         overwrite_output_dir=True,
         num_train_epochs=epoch,
