@@ -52,9 +52,9 @@ def get_data(decoder_start_token: str,
     train_data= preprocessor.make_set_as_df(train_json_list)
     
     if train_type == 'pretraining':
-        encoder_input_train, decoder_output_train = preprocessor.make_input(dataset=train_data)
+        encoder_input_train, decoder_output_train = preprocessor.make_input(preprocessor, dataset=train_data)
         return encoder_input_train, decoder_output_train
     elif train_type == 'finetuning':
-        encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_input(dataset=train_data)
+        encoder_input_train, decoder_input_train, decoder_output_train = preprocessor.make_input(preprocessor, dataset=train_data)
         return encoder_input_train, decoder_input_train, decoder_output_train
     

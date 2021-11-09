@@ -48,7 +48,7 @@ if __name__ == '__main__':
     print('-'*10, 'Load model', '-'*10,)
     model = get_bart_model('gogamza/kobart-summarization', len(tokenizer))
     print('-'*10, 'Bind for nsml setting', '-'*10,)
-    bind_model(model=model, parser=args)
+    bind_model(model=model, tokenizer=tokenizer, parser=args)
     if args.load:
         nsml.load(checkpoint=0, session='nia2012/final_dialogue/27')
     print('-'*10, 'Load tokenizer complete', '-'*10,)
