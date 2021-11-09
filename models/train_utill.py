@@ -48,7 +48,7 @@ def set_trainer(
         eval_dataset,
         epoch: int = 10, 
         batch_size: int = 16, 
-        accumalation_step: int = 1,)->Seq2SeqTrainer:
+        accumalation_step: int = 1,):#->Seq2SeqTrainer:
     '''
         Arguments:
             model:  
