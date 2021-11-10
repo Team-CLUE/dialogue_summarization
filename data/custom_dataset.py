@@ -19,6 +19,8 @@ class DatasetForTrain(Dataset):
         item2.pop('attention_mask')
         item.update(item2)
         item['labels'] = self.labels['input_ids'][idx] 
+        
+        return item
     
     def __len__(self):
         return self.len
