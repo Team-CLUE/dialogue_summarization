@@ -28,7 +28,7 @@ if __name__ == '__main__':
     # Load data
     ################# 
     print('-'*10, 'Load data', '-'*10,)
-    datas = get_data('<usr>', '</s>', 'pretraining')
+    datas = get_data('<usr>', '</s>', 'finetuning')
     if len(datas) == 2:
         encoder_input_train, decoder_output_train = datas
     elif len(datas) == 3:
@@ -59,15 +59,15 @@ if __name__ == '__main__':
     # Set dataset and trainer
     #################
     print('-'*10, 'Set Dataset and Trainer', '-'*10,)
-    train_loader, valid_loader = prepare_for_finetuning(model, tokenizer, encoder_input_train, decoder_input_train, decoder_output_train, epochs=args.epochs, batch_size=16)
+    train_loader, valid_loader = prepare_for_finetuning(tokenizer, encoder_input_train, decoder_input_train, decoder_output_train, batch_size=16)
     print('-'*10, 'Set dataset and trainer complete', '-'*10,)
-
+    
     #################
     # Start finetuning
     #################
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print('-'*10, 'Start finetuning:\t', device, '-'*10,)
-    finetuning(train_loader, valid_loader, epochs = args.epochs, accumalation_step = 10)
+    finetuning(model, train_loader, valid_loader, epochs = args.epochs, accumalation_step = 10)
     print('-'*10, 'finetuning complete', '-'*10,)
 
     nsml.save(0)

@@ -36,9 +36,9 @@ def finetuning(
     scaler = GradScaler()
     optimizer = AdamW(model.parameters(), lr=5e-5)
     scheduler = get_linear_schedule_with_warmup(optimizer, 200, len(train_loader) * epochs)
-    
+    print(train_loader, valid_loader)
     for e in tqdm(range(epochs)):
-        train_loss = train_per_epoch(model, train_loader, optimizer, scaler, e, accumalation_step, device)
+        train_loss = train_per_epoch(model, train_loader, optimizer, scaler, accumalation_step, device)
         print(f'{e}: train_loss: {train_loss/len(train_loader):.5f}')
         
         scheduler.step()
@@ -81,7 +81,7 @@ def train_per_epoch(
         label = batch_item['labels'].to(device)
         
         with autocast():
-            loss = model(input_ids=intput, attention_mask=intput_atm,  decoder_input_ids=decoder_input, decoder_attention_mask=decoder_input_atm,  labels=label)[0]
+            loss = model(input_ids=intput, attention_mask=intput_atm, decoder_input_ids=decoder_input, decoder_attention_mask=decoder_input_atm,  labels=label)[0]
             scaler.scale(loss).backward()
             batch_loss += loss.detach().cpu().numpy()
         
