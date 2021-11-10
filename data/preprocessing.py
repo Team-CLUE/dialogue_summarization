@@ -112,7 +112,7 @@ class Preprocess:
         return train_data, val_data
 
     @staticmethod
-    def make_input(self, dataset, is_valid=False, is_test = False):# -> Union(List[str], List[str], List[str]):
+    def make_input(self, dataset, is_valid=False, is_test = False) -> Tuple[List[str], List[str]] or Tuple[List[str], List[str], List[str]]:
         '''
             Arguments:
                 dataset: DataFrame
@@ -121,8 +121,8 @@ class Preprocess:
                     훈련, 검증, 테스트에 따라 문장들 전처리 후 반환
 
             Return
-                Union(List[str], List[str]) or
-                Union(List[str], List[str], List[str])
+                Tuple[List[str], List[str]] or
+                Tuple[List[str], List[str], List[str]]
 
             Summary:
                 Seq-to-Seq 모델을 학습 시키기 위해 필요한 special token들을 전처리 해주어 반환
