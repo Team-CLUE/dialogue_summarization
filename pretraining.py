@@ -6,7 +6,7 @@ from data.utill import get_data
 
 from models.toeknizers import get_tokenizer
 from models.bart import get_bart_model
-from models.train_utill import prepare_for_pretraining, set_trainer
+from train.train_utill import prepare_for_pretraining, set_trainer
 
 from nsml_setting.nsml import bind_model  
 

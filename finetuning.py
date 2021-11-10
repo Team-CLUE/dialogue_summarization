@@ -6,7 +6,8 @@ from data.utill import get_data
 
 from models.toeknizers import get_tokenizer
 from models.bart import get_bart_model
-from models.train_utill import prepare_for_pretraining, set_trainer
+from train.train_utill import prepare_for_finetuning
+from train.fine_train import finetuning
 
 from nsml_setting.nsml import bind_model  
 
@@ -58,20 +59,16 @@ if __name__ == '__main__':
     # Set dataset and trainer
     #################
     print('-'*10, 'Set Dataset and Trainer', '-'*10,)
-    
-
-
+    train_loader, valid_loader = prepare_for_finetuning(model, tokenizer, encoder_input_train, decoder_input_train, decoder_output_train, epochs=args.epochs, batch_size=16)
     print('-'*10, 'Set dataset and trainer complete', '-'*10,)
 
     #################
-    # Start pretraining
+    # Start finetuning
     #################
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-    print('-'*10, 'Start pretraining:\t', device, '-'*10,)
-    trainer.train()
-
-
-    print('-'*10, 'Pretraing complete', '-'*10,)
+    print('-'*10, 'Start finetuning:\t', device, '-'*10,)
+    finetuning(train_loader, valid_loader, epochs = args.epochs, accumalation_step = 10)
+    print('-'*10, 'finetuning complete', '-'*10,)
 
     nsml.save(0)
     print('-'*10, '저장완료!', '-'*10,)
