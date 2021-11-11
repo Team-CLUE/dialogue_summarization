@@ -256,7 +256,7 @@ if __name__ == '__main__':
 
     #%%
     bind_model(model=generate_model, tokenizer=tokenizer, types='model', parser=args)
-    nsml.load(checkpoint=9, session='nia2012/final_dialogue/68')
+    nsml.load(checkpoint=0, session='nia2012/final_dialogue/84')
     generate_model.to('cuda:0')
     
     # score = Rouge()

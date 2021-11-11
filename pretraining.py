@@ -17,9 +17,15 @@ if __name__ == '__main__':
     parser.add_argument('--iteration', type=str, default='0')
     parser.add_argument('--pause', type=int, default=0)
     parser.add_argument('--load', type=bool, default=False)
+    parser.add_argument('--check_point', type=int, default=None)
+    parser.add_argument('--session', type=int, default=None)
     args = parser.parse_args()
     # os.system("wandb login auth코드")
 
+    if args.load:
+        if args.check_point == None or args.session == None:
+            print("Please enter. --check_point <number> and --session <number>")
+            exit(1)
     if args.pause :
         nsml.paused(scope=locals())
 
@@ -51,7 +57,7 @@ if __name__ == '__main__':
     print('-'*10, 'Bind for nsml setting', '-'*10,)
     bind_model(model=model, tokenizer=tokenizer, parser=args)
     if args.load:
-        nsml.load(checkpoint=0, session='nia2012/final_dialogue/27')
+        nsml.load(checkpoint=args.check_point, session=f'nia2012/final_dialogue/{args.session}')
     print('-'*10, 'Load tokenizer complete', '-'*10,)
 
     #################
@@ -60,7 +66,7 @@ if __name__ == '__main__':
     print('-'*10, 'Set Dataset and Trainer', '-'*10,)
     dataset, data_collator, eval_dataset = prepare_for_pretraining(tokenizer, encoder_input_train)
     trainer = set_trainer(model, data_collator, dataset, eval_dataset,
-                                batch_size=16, accumalation_step=10, epoch=30)
+                                batch_size=16, accumalation_step=10, epoch=args.epochs)
     print('-'*10, 'Set dataset and trainer complete', '-'*10,)
 
     #################
