@@ -27,7 +27,7 @@ def bind_model(model, tokenizer, parser):
         print("model 로딩 완료!")
 
     def infer(test_path, **kwparser):
-        preprocessor = Preprocess()
+        preprocessor = Preprocess('<usr>', '</s>', 'finetuning')
 
         test_json_path = os.path.join(test_path, 'test_data', '*')
         print(f'test_json_path :\n{test_json_path}')

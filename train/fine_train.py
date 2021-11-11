@@ -9,16 +9,19 @@ from transformers import get_linear_schedule_with_warmup
 import nsml
 from tqdm import tqdm
 
+from train.train_utill import samples_print
+
 def finetuning(
-            model, 
+            model,
+            tokenizer, 
             train_loader, 
             valid_loader, 
             epochs: int = 10, 
             accumalation_step: int = 1) -> None:
     '''
         Arguments:
-            model: 
-                학습할 모델, 주체
+            model, tokenizer: 
+                학습할 모델, 주체 및 토크나이저
             train_loader, valid_loader: torch.utill.data.DataLoader
                 모델 학습 및 검증에 사용할 수 있는 데이터를 loading 해주는 객체
             epochs: int
@@ -36,14 +39,18 @@ def finetuning(
     scaler = GradScaler()
     optimizer = AdamW(model.parameters(), lr=5e-5)
     scheduler = get_linear_schedule_with_warmup(optimizer, 200, len(train_loader) * epochs)
-    print(train_loader, valid_loader)
+    
     for e in tqdm(range(epochs)):
+        model.train()
         train_loss = train_per_epoch(model, train_loader, optimizer, scaler, accumalation_step, device)
         print(f'{e}: train_loss: {train_loss/len(train_loader):.5f}')
         
         scheduler.step()
-        #valid_samples = valid_per_epoch()
+
+        model.eval()
+        summary, dialogue, ground_truth = valid_per_epoch(model, tokenizer, valid_loader, device)
         # sample print 하기
+        samples_print(summary, dialogue, ground_truth, amount = 10)
         
         nsml.save(e)
 
@@ -91,5 +98,48 @@ def train_per_epoch(
             optimizer.zero_grad()
     return batch_loss
         
-def valid_per_epoch():
-    print('코딩중')
+def valid_per_epoch( 
+            model, 
+            tokenizer,
+            valid_loader, 
+            device)->Tuple[List[str], List[str], List[str]]:
+    '''
+        Arguments:
+            model, optimizer, scaler: 
+                학습할 모델, 주체, 최적화 방식 및 learning rate 조절 스케쥴러
+            valid_loader: torch.utill.data.DataLoader
+                검증에 사용할 수 있는 데이터를 loading 해주는 객체
+            device: str
+                cuda or cpu
+                
+        Return
+            Tuple[List[str], List[str], List[str]]
+
+        Summary:
+            검증데이터를 이용해 모델이 생성한 요약문 리스트를 반환
+    '''
+    dialogue = []
+    summary = []
+    ground_truth = []
+    with torch.no_grad():
+        for item in tqdm(valid_loader):
+            generated_ids = model.generate(input_ids=item['input_ids'].to(device), 
+                            # do_sample=True, 
+                            # max_length=50, 
+                            # top_p=0.92, #92%로 설정하고 샘플링하기
+                            # top_k=0
+                            no_repeat_ngram_size=2, 
+                            early_stopping=True,
+                            max_length=50, 
+                            num_beams=5,
+                        )  
+            for predict_ids, dialogue_ids, label_ids in zip(generated_ids, item['input_ids'], item['labels']):
+                result = tokenizer.decode(predict_ids, skip_special_tokens=True)
+                index = result.find('.')
+                if index != -1:
+                    result = result[:index+1]
+                dialogue.append(tokenizer.decode(dialogue_ids, skip_special_tokens=True))
+                ground_truth.append(tokenizer.decode(label_ids, skip_special_tokens=True))
+                summary.append(result)
+    
+    return summary, dialogue, ground_truth

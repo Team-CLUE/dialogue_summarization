@@ -18,8 +18,6 @@ import pickle
 import re
 from tqdm import tqdm
 
-from rouge import Rouge
-
 class Mydataset(Dataset):
     def __init__(self, encoder_input, test_id, len):
         self.encoder_input = encoder_input
@@ -148,10 +146,10 @@ def bind_model(model, tokenizer, types, parser):
         preprocessor = Preprocess()
 
         test_json_path = os.path.join(test_path, 'test_data', '*')
-        print(f'test_json_path :\n{test_json_path}')
+        #print(f'test_json_path :\n{test_json_path}')
         test_path_list = glob(test_json_path)
         test_path_list.sort()
-        print(f'test_path_list :\n{test_path_list}')
+        #print(f'test_path_list :\n{test_path_list}')
 
         test_json_list = preprocessor.make_dataset_list(test_path_list)
         test_data = preprocessor.make_set_as_df(test_json_list)
@@ -170,7 +168,7 @@ def bind_model(model, tokenizer, types, parser):
                 max_length=256, 
                 return_token_type_ids=False,)
         #tokenized_decoder_inputs = tokenizer.tokenize(decoder_input_test, return_tensors="pt", padding=True, add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
-        print(tokenized_encoder_inputs['input_ids'][0:10])
+        #print(tokenized_encoder_inputs['input_ids'][0:10])
 
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         
@@ -258,7 +256,7 @@ if __name__ == '__main__':
 
     #%%
     bind_model(model=generate_model, tokenizer=tokenizer, types='model', parser=args)
-    nsml.load(checkpoint=0, session='nia2012/final_dialogue/32')
+    nsml.load(checkpoint=9, session='nia2012/final_dialogue/68')
     generate_model.to('cuda:0')
     
     # score = Rouge()

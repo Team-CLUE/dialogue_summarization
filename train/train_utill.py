@@ -1,5 +1,5 @@
 from typing import *
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, RandomSampler
 
 from data.custom_dataset import LineByLineTextDataset, DatasetForTrain
 
@@ -141,7 +141,32 @@ def prepare_for_finetuning(
     train_dataset = DatasetForTrain(tokenized_encoder_inputs, tokenized_decoder_inputs, tokenized_decoder_ouputs, len(encoder_input_train))
     valid_dataset = DatasetForTrain(val_tokenized_encoder_inputs, val_tokenized_decoder_inputs, val_tokenized_decoder_ouputs, 10)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
+    random_sampler = RandomSampler(train_dataset)
+
+    train_dataloader = DataLoader(train_dataset, sampler=random_sampler, batch_size=batch_size)
     valid_dataloader = DataLoader(valid_dataset, batch_size=16)
     
     return train_dataloader, valid_dataloader
+
+def samples_print(summary, dialogue, ground_truth, amount = 10):
+    '''
+        Arguments:
+            summary: List[str]
+                모델이 예측한 요약문
+            dialogue: List[str]
+                모델이 요약문을 만든 원본 대화문
+            ground_truth: List[str]
+                모델이 생성해야할 목표
+            amount: int
+                디코더가 출력해야할 라벨(문장)
+
+        Return
+           
+        Summary:
+            검증 데이터로 모델이 예측한 요약문을 출력
+    '''
+    print('-'*100)
+    print("Dialogue: ", dialogue)
+    print("Ground truth: ", ground_truth)
+    print("Predicted: ", summary)
+    print('-'*100)

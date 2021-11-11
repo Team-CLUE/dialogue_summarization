@@ -52,7 +52,7 @@ if __name__ == '__main__':
     print('-'*10, 'Bind for nsml setting', '-'*10,)
     bind_model(model=model, tokenizer=tokenizer, parser=args)
     if args.load:
-        nsml.load(checkpoint=0, session='nia2012/final_dialogue/46')
+        nsml.load(checkpoint=0, session='nia2012/final_dialogue/13')
     print('-'*10, 'Load tokenizer complete', '-'*10,)
 
     #################
@@ -69,7 +69,4 @@ if __name__ == '__main__':
     print('-'*10, 'Start finetuning:\t', device, '-'*10,)
     finetuning(model.to(device), train_loader, valid_loader, epochs = args.epochs, accumalation_step = 10)
     print('-'*10, 'finetuning complete', '-'*10,)
-
-    nsml.save(0)
-    print('-'*10, '저장완료!', '-'*10,)
     
