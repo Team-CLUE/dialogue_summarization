@@ -2,10 +2,11 @@ import os
 from glob import glob
 from typing import *
 
-from nsml import HAS_DATASET, DATASET_PATH
+#from nsml import HAS_DATASET, DATASET_PATH
 
 from data.preprocessing import Preprocess
 
+DATASET_PATH = '/opt/ml/summarization/data/Training/'
 
 def train_data_loader(root_path:str)->List[str]:
     '''
@@ -19,8 +20,8 @@ def train_data_loader(root_path:str)->List[str]:
         Summary:
             root 폴더 안의 훈련을 위한 json file들의 경로 리스트를 반환
 
-    '''       
-    train_path = os.path.join(root_path, 'train', 'train_data', '*')
+    '''      
+    train_path = os.path.join(root_path, '*')
     pathes = glob(train_path) # <- json file 들어있는 폴더
     return pathes
 

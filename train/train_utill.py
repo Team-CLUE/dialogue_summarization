@@ -73,8 +73,7 @@ def set_trainer(
     '''
      # set training args
     training_args = Seq2SeqTrainingArguments(
-        report_to = 'tensorboard',
-        output_dir='./',
+        output_dir='./results',
         overwrite_output_dir=True,
         num_train_epochs=epoch,
         per_device_train_batch_size=batch_size,
@@ -82,7 +81,7 @@ def set_trainer(
         evaluation_strategy = 'steps',
         eval_steps=15000,
         save_steps=15000,
-        save_total_limit=1,
+        save_total_limit=2,
         fp16=True,
         load_best_model_at_end=True,
         seed=42,
