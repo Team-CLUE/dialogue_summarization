@@ -7,8 +7,6 @@ from transformers import DataCollatorForLanguageModeling
 from transformers.models.auto.tokenization_auto import AutoTokenizer
 from transformers import Seq2SeqTrainingArguments, Seq2SeqTrainer
 
-
-
 def prepare_for_pretraining(
         tokenizer: AutoTokenizer, 
         encoder_input_train: List[str]
