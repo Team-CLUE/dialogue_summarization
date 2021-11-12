@@ -33,7 +33,7 @@ def prepare_for_pretraining(
     )
     # set mlm task  DataCollatorForSOP(DataCollatorForLanguageModeling)
     data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, mlm=True, mlm_probability=0.15
+        tokenizer=tokenizer, mlm=True, mlm_probability=0.15 # 0.3
     )
     eval_dataset = LineByLineTextDataset(
         tokenizer=tokenizer,

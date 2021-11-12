@@ -33,7 +33,7 @@ if __name__ == '__main__':
     # Load data
     ################# 
     print('-'*10, 'Load data', '-'*10,)
-    datas = get_data('<usr>', '</s>', 'pretraining')
+    datas = get_data('<usr>', '</s>', 'pretraining') # -> finetuning
     if len(datas) == 2:
         encoder_input_train, decoder_output_train = datas
     elif len(datas) == 3:

@@ -273,7 +273,7 @@ if __name__ == '__main__':
     generate_model.resize_token_embeddings(len(tokenizer))  
 
     bind_model(model=generate_model, types='model', parser=args)
-    nsml.load(checkpoint=0, session='nia2012/final_dialogue/46')
+    nsml.load(checkpoint=0, session='nia2012/final_dialogue/87')
     generate_model.to('cuda:0')
 
     if args.pause :
