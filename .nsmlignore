@@ -1,2 +1,6 @@
 README.md
 old/
+wandb/
+results/
+nohup.out
+.gitignore
