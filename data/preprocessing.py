@@ -145,6 +145,8 @@ class Preprocess:
             decoder_input = dataset['summary'].apply(lambda x : self.decoder_start_token + str(x))
             decoder_output = dataset['summary'].apply(lambda x : str(x) + self.eos_token)
             encoder_input = delete_char(encoder_input)
+            encoder_input = delete_others(encoder_input)
+            
             if self.train_type == 'pretraining':
                 return list(encoder_input) + list(decoder_input), decoder_output
             elif self.train_type == 'finetuning':
@@ -168,4 +170,28 @@ def delete_char(texts:List[str])->List[str]:
         text = proc.sub("", text).strip()
         if text:
             preprocessed_text.append(text)
+    print("deleted unnecessary char!!")
+    return preprocessed_text
+
+def delete_others(texts:List[str])->List[str]:
+    '''
+        Arguments:
+            texts: List[str]
+                string 리스트
+
+        Return
+            List[str]
+
+        Summary:
+            학습전 문장에서 불필요한 characters 제거 후 반환
+    '''
+    preprocessed_text = []
+    for text in tqdm(texts):
+        candidate = ['#@URL#','#@이름#','#@계정#','#@신원#','#@전번#',
+                '#@금융#','#@번호#','#@주소#','#@소속#','#@기타#', '#@이모티콘#', '#@시스템#사진#', '#@시스템#검색#',  '#@시스템#지도#', '#@시스템#기타#', '#@시스템#파일#',
+                '#@시스템#동영상#', '#@시스템#송금#', '#@시스템#삭제#']
+        for cd in candidate:
+            text = text.replace(cd, '')
+        preprocessed_text.append(text)
+    print("deleted unnecessary tokens (E.g. #@URL#)!!")
     return preprocessed_text

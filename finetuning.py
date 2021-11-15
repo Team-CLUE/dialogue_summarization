@@ -1,15 +1,15 @@
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import argparse
-import nsml
 import torch
 
 from data.utill import get_data
 
 from models.toeknizers import get_tokenizer
 from models.bart import get_bart_model
-from train.train_utill import prepare_for_finetuning
-from train.fine_train import finetuning
-
-from nsml_setting.nsml import bind_model  
+from train.train_utill import prepare_for_finetuning, set_trainer_for_finetuning
+#from train.fine_train import finetuning
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='nia_test')
@@ -17,19 +17,9 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=1)
     parser.add_argument('--iteration', type=str, default='0')
     parser.add_argument('--pause', type=int, default=0)
-    parser.add_argument('--load', type=bool, default=False)
-    parser.add_argument('--check_point', type=int, default=None)
-    parser.add_argument('--session', type=int, default=None)
     args = parser.parse_args()
     # os.system("wandb login auth코드")
-    if args.load:
-        if args.check_point == None or args.session == None:
-            print("Please enter. --check_point <number> and --session <number>")
-            exit(1)
-
-    if args.pause :
-        nsml.paused(scope=locals())
-
+    
     #################
     # Load data
     ################# 
@@ -56,23 +46,22 @@ if __name__ == '__main__':
     print('-'*10, 'Load model', '-'*10,)
     model = get_bart_model('gogamza/kobart-summarization', len(tokenizer))
     print('-'*10, 'Bind for nsml setting', '-'*10,)
-    bind_model(model=model, tokenizer=tokenizer, parser=args)
-    if args.load:
-        nsml.load(checkpoint=args.check_point, session=f'nia2012/final_dialogue/{args.session}')
     print('-'*10, 'Load tokenizer complete', '-'*10,)
 
     #################
     # Set dataset and trainer
     #################
     print('-'*10, 'Set Dataset and Trainer', '-'*10,)
-    train_loader, valid_loader = prepare_for_finetuning(tokenizer, encoder_input_train, decoder_input_train, decoder_output_train, batch_size=16)
+    train_dataset, valid_dataset = prepare_for_finetuning(tokenizer, encoder_input_train, decoder_input_train, decoder_output_train, batch_size=16)
+    trainer = set_trainer_for_finetuning(model, tokenizer, train_dataset, valid_dataset, epoch=args.epochs, batch_size=16, accumalation_step=10)
     print('-'*10, 'Set dataset and trainer complete', '-'*10,)
-    
+
     #################
     # Start finetuning
     #################
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print('-'*10, 'Start finetuning:\t', device, '-'*10,)
-    finetuning(model.to(device), train_loader, valid_loader, epochs = args.epochs, accumalation_step = 10)
+    trainer.train()
+    #finetuning(model.to(device), train_loader, valid_loader, epochs = args.epochs, accumalation_step = 10)
     print('-'*10, 'finetuning complete', '-'*10,)
     
