@@ -175,8 +175,6 @@ class Seq2SeqTrainer(Trainer):
 
         return output.metrics
 
-
-
     def predict(
         self,
         test_dataset: Dataset,

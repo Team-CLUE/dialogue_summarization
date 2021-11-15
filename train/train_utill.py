@@ -177,11 +177,11 @@ def prepare_for_finetuning(
         Summary:
             학습을 위한 dataset을 tokenizing 하고, DataLoader에 담아 반환
     '''
-    tokenized_encoder_inputs = tokenizer(list(encoder_input_train)[:10], return_tensors="pt", padding=True, 
+    tokenized_encoder_inputs = tokenizer(list(encoder_input_train), return_tensors="pt", padding=True, 
                             add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
-    tokenized_decoder_inputs = tokenizer(list(decoder_input_train)[:10], return_tensors="pt", padding=True, 
+    tokenized_decoder_inputs = tokenizer(list(decoder_input_train), return_tensors="pt", padding=True, 
                         add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
-    tokenized_decoder_ouputs = tokenizer(list(decoder_output_train)[:10], return_tensors="pt", padding=True, 
+    tokenized_decoder_ouputs = tokenizer(list(decoder_output_train), return_tensors="pt", padding=True, 
                         add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
     
 
@@ -192,7 +192,7 @@ def prepare_for_finetuning(
     val_tokenized_decoder_ouputs = tokenizer(list(decoder_output_train)[:10], return_tensors="pt", padding=True, 
                         add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
 
-    train_dataset = DatasetForTrain(tokenized_encoder_inputs, tokenized_decoder_inputs, tokenized_decoder_ouputs, 10)#len(encoder_input_train))
+    train_dataset = DatasetForTrain(tokenized_encoder_inputs, tokenized_decoder_inputs, tokenized_decoder_ouputs, len(encoder_input_train))
     valid_dataset = DatasetForTrain(val_tokenized_encoder_inputs, val_tokenized_decoder_inputs, val_tokenized_decoder_ouputs, 10)
 
     # random_sampler = RandomSampler(train_dataset)
