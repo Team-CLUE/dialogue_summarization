@@ -13,6 +13,7 @@ nsml = {git = "https://github.com/n-CLAIR/nsml-local"}
 wandb = "^0.12.6"
 ipykernel = "^6.5.0"
 ipywidgets = "^7.6.5"
+seaborn = "^0.11.2"
 
 [tool.poetry.dev-dependencies]
 

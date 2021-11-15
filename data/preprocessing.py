@@ -45,7 +45,7 @@ class Preprocess:
         '''
         json_data_list = []
 
-        for path in path_list:
+        for path in tqdm(path_list):
             with open(path) as f:
                 json_data_list.append(json.load(f))
 
@@ -71,7 +71,7 @@ class Preprocess:
             train_dialogue_id = []
             train_dialogue_type = []
             train_summary = []
-            for topic in train_set:
+            for topic in tqdm(train_set):
                 for data in topic['data']:
                     train_dialogue_type.append(data['header']['dialogueInfo']['topic'])
                     train_dialogue_id.append(data['header']['dialogueInfo']['dialogueID'])
