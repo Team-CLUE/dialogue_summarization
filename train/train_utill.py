@@ -127,7 +127,7 @@ def set_trainer_for_finetuning(
     '''
      # set training args
     training_args = Seq2SeqTrainingArguments(
-        output_dir='./results/test', #./
+        output_dir='./results/fine_tuning/del_others30_10epoch', #./
         overwrite_output_dir=True,
         num_train_epochs=epoch,
         per_device_train_batch_size=batch_size,

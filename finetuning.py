@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=1)
     parser.add_argument('--iteration', type=str, default='0')
     parser.add_argument('--pause', type=int, default=0)
+    parser.add_argument('--load', type=str, default=None)
     args = parser.parse_args()
     # os.system("wandb login auth코드")
     
@@ -44,7 +45,10 @@ if __name__ == '__main__':
     # Load model
     ################# 
     print('-'*10, 'Load model', '-'*10,)
-    model = get_bart_model('gogamza/kobart-summarization', len(tokenizer))
+    if args.load is not None:
+        model = get_bart_model(args.load, len(tokenizer))
+    else:    
+        model = get_bart_model('gogamza/kobart-summarization', len(tokenizer))
     print('-'*10, 'Bind for nsml setting', '-'*10,)
     print('-'*10, 'Load tokenizer complete', '-'*10,)
 
