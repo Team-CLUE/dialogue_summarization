@@ -47,9 +47,11 @@ if __name__ == '__main__':
     print('-'*10, 'Load model', '-'*10,)
     if args.load is not None:
         model = get_bart_model(args.load, len(tokenizer))
+        save_dir = os.path.join(args.load, 'pytorch_model.bin')
+        state_dict = torch.load(save_dir) 
+        model.load_state_dict(state_dict)
     else:    
         model = get_bart_model('gogamza/kobart-summarization', len(tokenizer))
-    print('-'*10, 'Bind for nsml setting', '-'*10,)
     print('-'*10, 'Load tokenizer complete', '-'*10,)
 
     #################

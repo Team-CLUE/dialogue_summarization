@@ -148,10 +148,29 @@ class Seq2SeqTrainer(Trainer):
             metric_key_prefix=metric_key_prefix,
         )
 
-        print('length:', len(output), len(output[0][0]), len(output[0][1]), len(output[0][0][0]), len(output[0][1][0]), len(output[1]))
-        for pred_ids, label in zip(np.argmax(output[0][0], axis=-1), output[1]):
-            print("Predict: ", self.tokenizer.decode(pred_ids, skip_special_tokens=True))
-            print("Label: ",self.tokenizer.decode(label, skip_special_tokens=True))
+        #print('length:', len(output), len(output[0][0]), len(output[0][1]), len(output[0][0][0]), len(output[0][1][0]), len(output[1]))
+        # for pred_ids, label in zip(np.argmax(output[0][0], axis=-1), output[1]):
+        #     print('-'*100)
+        #     print("Predict: ", self.tokenizer.decode(pred_ids, skip_special_tokens=True))
+        #     print("Label: ",self.tokenizer.decode(label, skip_special_tokens=True))
+            
+        device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        for item in eval_dataloader:
+            generated_ids = self.model.generate(input_ids=item['input_ids'].to(device), 
+                            no_repeat_ngram_size=2, 
+                            early_stopping=True,
+                            max_length=50, 
+                            num_beams=5,
+                        )  
+            for idx, ids in enumerate(generated_ids):
+                result = self.tokenizer.decode(ids, skip_special_tokens=True)
+                index = result.find('.')
+                if index != -1:
+                    result = result[:index+1]
+                
+                print('-'*100)
+                print("Predict: ", result)
+                print("Label: ",self.tokenizer.decode(item['labels'][idx], skip_special_tokens=True))
 
         total_batch_size = self.args.eval_batch_size * self.args.world_size
         output.metrics.update(
@@ -170,9 +189,7 @@ class Seq2SeqTrainer(Trainer):
             xm.master_print(met.metrics_report())
 
         self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, output.metrics)
-
         self._memory_tracker.stop_and_update_metrics(output.metrics)
-
         return output.metrics
 
     def predict(
