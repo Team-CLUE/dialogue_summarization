@@ -1,2 +1,6 @@
 ./old
 __pycache__
+wandb/
+results/
+mecab/
+nohup.out
