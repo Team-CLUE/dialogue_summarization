@@ -72,7 +72,7 @@ def set_trainer(
     '''
      # set training args
     training_args = Seq2SeqTrainingArguments(
-        output_dir='./results/test', #./
+        output_dir='./results/mecab', #./
         overwrite_output_dir=True,
         num_train_epochs=epoch,
         per_device_train_batch_size=batch_size,

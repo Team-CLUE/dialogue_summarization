@@ -4,3 +4,4 @@ wandb/
 results/
 nohup.out
 mecab/
+mecab.txt

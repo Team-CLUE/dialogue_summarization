@@ -4,3 +4,4 @@ wandb/
 results/
 nohup.out
 .gitignore
+mecab.txt
