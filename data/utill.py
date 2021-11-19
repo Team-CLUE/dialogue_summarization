@@ -26,7 +26,9 @@ def train_data_loader(root_path:str)->List[str]:
 
 def get_data(decoder_start_token: str,
             eos_token: str,
-            train_type: str)->Tuple[List[str], List[str], List[str]]:
+            train_type: str,
+            data_path: str = DATASET_PATH,
+            )->Tuple[List[str], List[str], List[str]]:
     '''
         Arguments:
             decoder_start_token: str 
@@ -42,9 +44,12 @@ def get_data(decoder_start_token: str,
         Summary:
             Seq-to-Seq 모델을 학습 시키기 위해 필요한 special token들을 전처리 해주어 반환
     '''
-    train_path_list = train_data_loader(DATASET_PATH)
+    if data_path != DATASET_PATH:
+        train_path_list = data_path
+    else:
+        train_path_list = train_data_loader(data_path)
+    
     train_path_list.sort()
-
     preprocessor = Preprocess(decoder_start_token, eos_token, train_type)
 
     train_json_list = preprocessor.make_dataset_list(train_path_list)

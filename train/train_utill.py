@@ -145,3 +145,42 @@ def prepare_for_finetuning(
     valid_dataloader = DataLoader(valid_dataset, batch_size=16)
     
     return train_dataloader, valid_dataloader
+
+
+
+def prepare_for_inference(
+        tokenizer: AutoTokenizer, 
+        encoder_input_train: List[str],
+        decoder_input_train: List[str],
+        batch_size: int=16,
+        )-> Tuple[DataLoader, DataLoader]:
+    '''
+        Arguments:
+            tokenizer: AutoTokenizer 
+                토크나이저
+            encoder_input_train: List[str]
+                모델 학습에 사용될 string list
+            decoder_input: List[str]
+                디코더에 들어갈 입력
+            decoder_output_train: List[str]
+                디코더가 출력해야할 라벨(문장)
+
+        Return
+            Tuple[DataLoader, DataLoader]
+
+        Summary:
+            학습을 위한 dataset을 tokenizing 하고, DataLoader에 담아 반환
+    '''
+    tokenized_encoder_inputs = tokenizer(list(encoder_input_train), return_tensors="pt", padding=True, 
+                            add_special_tokens=True, truncation=True, max_length=256, return_token_type_ids=False,)
+    tokenized_decoder_inputs = tokenizer(list(decoder_input_train), return_tensors="pt", padding=True, 
+                        add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
+    tokenized_decoder_ouputs = tokenizer(list(decoder_output_train), return_tensors="pt", padding=True, 
+                        add_special_tokens=True, truncation=True, max_length=50, return_token_type_ids=False,)
+    
+    test_dataset = DatasetForTrain(tokenized_encoder_inputs, tokenized_decoder_inputs, tokenized_decoder_ouputs, len(encoder_input_train))
+
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
+
+    
+    return test_dataloader
