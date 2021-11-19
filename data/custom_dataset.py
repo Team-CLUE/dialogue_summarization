@@ -26,18 +26,14 @@ class DatasetForTrain(Dataset):
         return self.len
 
 class DatasetForInference(Dataset):
-    def __init__(self, encoder_input, test_id, len):
+    def __init__(self, encoder_input):
         self.encoder_input = encoder_input
-        self.test_id = test_id
-        self.len = len
 
     def __getitem__(self, idx):
-        item = {key: val[idx].clone().detach() for key, val in self.encoder_input.items()}
-        item['ID'] = self.test_id[idx]
-        return item
+        return self.encoder_input[idx]
     
     def __len__(self):
-        return self.len
+        return len(self.encoder_input)
 
 class LineByLineTextDataset(Dataset):
     """
