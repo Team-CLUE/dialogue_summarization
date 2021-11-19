@@ -30,10 +30,10 @@ class DatasetForInference(Dataset):
         self.encoder_input = encoder_input
 
     def __getitem__(self, idx):
-        return self.encoder_input[idx]
+        return self.encoder_input['input_ids'][idx], self.encoder_input['attention_mask'][idx]
     
     def __len__(self):
-        return len(self.encoder_input)
+        return len(self.encoder_input['input_ids'])
 
 class LineByLineTextDataset(Dataset):
     """

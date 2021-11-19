@@ -152,7 +152,7 @@ def prepare_for_inference(
         tokenizer: AutoTokenizer, 
         encoder_input_test: List[str],
         batch_size: int=16,
-        )-> Tuple[DataLoader, DataLoader]:
+        )-> Tuple[DataLoader]:
     '''
         Arguments:
             tokenizer: AutoTokenizer 
@@ -170,17 +170,17 @@ def prepare_for_inference(
         Summary:
             학습을 위한 dataset을 tokenizing 하고, DataLoader에 담아 반환
     '''
+
     tokenized_encoder_inputs = tokenizer(
-        list(encoder_input_test), 
+        encoder_input_test, 
         return_tensors="pt", 
-        padding=True, 
-        add_special_tokens=True, 
-        truncation=True, max_length=256, 
+        padding=True,
+        truncation=True, 
+        max_length=256, 
         return_token_type_ids=False,
     )
    
     test_dataset = DatasetForInference(tokenized_encoder_inputs)
-
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
 
     
