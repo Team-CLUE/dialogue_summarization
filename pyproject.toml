@@ -14,6 +14,7 @@ wandb = "^0.12.6"
 konlpy = "^0.5.2"
 tweepy = "3.7.0"
 mecab-python = "^1.0.0"
+rouge = "^1.0.1"
 
 [tool.poetry.dev-dependencies]
 

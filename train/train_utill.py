@@ -1,7 +1,7 @@
 from typing import *
 from torch.utils.data import DataLoader
 
-from data.custom_dataset import LineByLineTextDataset, DatasetForTrain
+from data.custom_dataset import LineByLineTextDataset, DatasetForTrain, DatasetForInference
 
 from transformers import DataCollatorForLanguageModeling
 from transformers.models.auto.tokenization_auto import AutoTokenizer
@@ -145,3 +145,43 @@ def prepare_for_finetuning(
     valid_dataloader = DataLoader(valid_dataset, batch_size=16)
     
     return train_dataloader, valid_dataloader
+
+
+
+def prepare_for_inference(
+        tokenizer: AutoTokenizer, 
+        encoder_input_test: List[str],
+        batch_size: int=16,
+        )-> Tuple[DataLoader]:
+    '''
+        Arguments:
+            tokenizer: AutoTokenizer 
+                토크나이저
+            encoder_input_train: List[str]
+                모델 학습에 사용될 string list
+            decoder_input: List[str]
+                디코더에 들어갈 입력
+            decoder_output_train: List[str]
+                디코더가 출력해야할 라벨(문장)
+
+        Return
+            Tuple[DataLoader, DataLoader]
+
+        Summary:
+            학습을 위한 dataset을 tokenizing 하고, DataLoader에 담아 반환
+    '''
+
+    tokenized_encoder_inputs = tokenizer(
+        encoder_input_test, 
+        return_tensors="pt", 
+        padding=True,
+        truncation=True, 
+        max_length=256, 
+        return_token_type_ids=False,
+    )
+   
+    test_dataset = DatasetForInference(tokenized_encoder_inputs)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
+
+    
+    return test_dataloader

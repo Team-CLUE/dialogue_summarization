@@ -672,7 +672,7 @@ termcolor = ">=1.1.0,<2.0.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "2520b986ccec0390054c9c83f6801a44df39d5e22b6ef7bb10a6647279f9686b"
+content-hash = "e1d206387c4094f70ef21204489da66d26dee958a9e4f2af91f661d3e6493159"
 
 [metadata.files]
 beautifulsoup4 = [
