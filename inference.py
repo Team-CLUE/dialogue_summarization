@@ -5,10 +5,11 @@ from glob import glob
 from transformers import AutoConfig, BartForConditionalGeneration
 import torch
 import numpy as np
-import rouge
+from rouge import Rouge
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from train.train_utill import prepare_for_inference
+from konlpy.tag import Mecab
 
 DATA_PATH = "dataset/Validation/*/*"
 
@@ -62,5 +63,13 @@ if __name__ == "__main__":
                             )
             predicted_s = np.array(list(map(tokenizer.decode, generated_ids)))
             predictions = np.append(predictions, predicted_s)
+
+    # Calculate result
+    mecab = Mecab()
     
-    
+    tokenized_predictions = list(map(mecab.pos, predictions))
+    tokenized_gt = list(map(mecab.pos, ground_trues))
+
+    rouge_l = Rouge()
+    calculate = rouge_l.get_scores(tokenized_predictions, tokenized_gt)
+    print("모델 결과: ", np.mean([x['rouge-l'] for x in calculate]))
