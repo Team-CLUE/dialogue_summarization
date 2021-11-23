@@ -21,14 +21,13 @@ def bind_model(model, tokenizer, parser):
 
     # 저장한 모델을 불러올 수 있는 함수입니다.
     def load(dir_name, *parser):      
-        print(model)
         save_dir = os.path.join(dir_name, 'model/pytorch_model.bin')
         state_dict = torch.load(save_dir) 
         model.load_state_dict(state_dict)
         print("model 로딩 완료!")
 
     def infer(test_path, **kwparser):
-        preprocessor = Preprocess()
+        preprocessor = Preprocess('<usr>', '</s>', 'finetuning')
 
         test_json_path = os.path.join(test_path, 'test_data', '*')
         print(f'test_json_path :\n{test_json_path}')

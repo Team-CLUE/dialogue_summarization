@@ -21,7 +21,7 @@ def train_data_loader(root_path:str)->List[str]:
 
     '''       
     train_path = os.path.join(root_path, 'train', 'train_data', '*')
-    pathes = glob(train_path)
+    pathes = glob(train_path) # <- json file 들어있는 폴더
     return pathes
 
 def get_data(decoder_start_token: str,
