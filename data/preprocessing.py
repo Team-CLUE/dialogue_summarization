@@ -3,7 +3,7 @@ from typing import *
 
 import pandas as pd
 from pandas.core.frame import DataFrame
-
+import pickle as pkl
 import re
 from tqdm import tqdm
 
@@ -130,6 +130,7 @@ class Preprocess:
         if is_test:
             encoder_input = dataset['dialogue']
             decoder_input = [self.decoder_start_token] * len(dataset)
+            encoder_input = add_stemmed_knowledge(encoder_input)
             encoder_input = delete_char(encoder_input)
             encoder_input = delete_others(encoder_input)
             return encoder_input, decoder_input
@@ -138,6 +139,7 @@ class Preprocess:
             encoder_input = dataset['dialogue']
             decoder_input = [self.decoder_start_token] * len(dataset)
             decoder_output = dataset['summary'].apply(lambda x: str(x) + self.eos_token)
+            encoder_input = add_stemmed_knowledge(encoder_input)
             encoder_input = delete_char(encoder_input)
             encoder_input = delete_others(encoder_input)
             return encoder_input, decoder_input, decoder_output
@@ -146,6 +148,7 @@ class Preprocess:
             encoder_input = dataset['dialogue']
             decoder_input = dataset['summary'].apply(lambda x : self.decoder_start_token + str(x))
             decoder_output = dataset['summary'].apply(lambda x : str(x) + self.eos_token)
+            encoder_input = add_stemmed_knowledge(encoder_input)
             encoder_input = delete_char(encoder_input)
             encoder_input = delete_others(encoder_input)
             
@@ -173,6 +176,7 @@ def delete_char(texts:List[str])->List[str]:
         if text:
             preprocessed_text.append(text)
     return preprocessed_text
+        
 
 def delete_others(texts:List[str])->List[str]:
     '''
@@ -195,4 +199,32 @@ def delete_others(texts:List[str])->List[str]:
             text = text.replace(cd, '')
         preprocessed_text.append(text)
     print("deleted unnecessary tokens (E.g. #@URL#)!!")
+    return preprocessed_text
+
+
+def add_stemmed_knowledge(texts:List[str])->List[str]:
+    '''
+        Arguments:
+            texts: List[str]
+                string 리스트
+
+        Return
+            List[str]
+
+        Summary:
+            학습전 문장에서 ㅇㅇ,ㅋㅋ,ㅌㅌ 등의 단어를 의미론적으로 바꿔주는 사전을 통해 데이터를 추가한 후 반환
+    '''
+
+    preprocessed_text = []
+    dict_path = "stem_dict.bin"
+    
+    with open(dict_path, "rb" ) as f:
+        stem_dict = pkl.load(f)
+
+    for text in tqdm(texts):
+        for stem, replaced in stem_dict.items():
+            text = text.replace(stem, replaced)
+            preprocessed_text.append(text)
+
+    print("add necessary meaning (E.g. ㅋㅋ,ㅇㅇ,ㅌㅌ)!!")
     return preprocessed_text
