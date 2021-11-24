@@ -44,6 +44,7 @@ def prepare_for_pretraining(
 
 def set_trainer(
         model, 
+        tokenizer,
         data_collator, 
         dataset, 
         eval_dataset,
@@ -89,6 +90,7 @@ def set_trainer(
     # set Trainer class for pre-training
     trainer = Seq2SeqTrainer(
         model=model,
+        tokenizer=tokenizer,
         args=training_args,
         data_collator=data_collator,
         train_dataset=dataset,

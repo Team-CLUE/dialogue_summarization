@@ -59,7 +59,7 @@ if __name__ == '__main__':
     #################
     print('-'*10, 'Set Dataset and Trainer', '-'*10,)
     dataset, data_collator, eval_dataset = prepare_for_pretraining(tokenizer, encoder_input_train)
-    trainer = set_trainer(model, data_collator, dataset, eval_dataset,
+    trainer = set_trainer(model, tokenizer, data_collator, dataset, eval_dataset,
                                 batch_size=16, accumalation_step=10, epoch=args.epochs)
     print('-'*10, 'Set dataset and trainer complete', '-'*10,)
 
