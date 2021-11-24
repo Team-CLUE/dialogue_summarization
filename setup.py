@@ -1,4 +1,4 @@
-#nsml: dacon/nia-tf:1.0
+#nsml:scatterlab/python-mecab-ko:3.7-circleci-node
 
 from distutils.core import setup
 setup(
@@ -10,5 +10,10 @@ setup(
         'torch==1.7.1',
         'soynlp',
         'rouge',
+        'konlpy',
+        'python-dev-tools',
+        'python-mecab-ko',
+        'tweepy==3.7'
+
     ]
 )
