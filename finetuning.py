@@ -18,14 +18,24 @@ if __name__ == '__main__':
     parser.add_argument('--iteration', type=str, default='0')
     parser.add_argument('--pause', type=int, default=0)
     parser.add_argument('--load', type=str, default=None)
+    parser.add_argument('--tokenizer', type=str, default=None)
     args = parser.parse_args()
     # os.system("wandb login auth코드")
     
+    if args.tokenizer == 'mecab':
+        # [CLS]: 2, [SEP]: 3
+        decoder_strat_token = ''
+        end_of_sentence = ''
+    else:
+        args.tokenizer = 'gogamza/kobart-summarization'
+        decoder_strat_token = '<usr>'
+        end_of_sentence = '</s>'
+
     #################
     # Load data
     ################# 
     print('-'*10, 'Load data', '-'*10,)
-    datas = get_data('<usr>', '</s>', 'finetuning')
+    datas = get_data(decoder_strat_token, end_of_sentence, 'finetuning')
     if len(datas) == 2:
         encoder_input_train, decoder_output_train = datas
     elif len(datas) == 3:
@@ -38,7 +48,7 @@ if __name__ == '__main__':
     # Load tokenizer
     ################# 
     print('-'*10, 'Load tokenizer', '-'*10,)
-    tokenizer = get_tokenizer('gogamza/kobart-summarization')
+    tokenizer = get_tokenizer(args.tokenizer)
     print('-'*10, 'Load tokenizer complete', '-'*10,)
     
     #################
@@ -46,12 +56,12 @@ if __name__ == '__main__':
     ################# 
     print('-'*10, 'Load model', '-'*10,)
     if args.load is not None:
-        model = get_bart_model(args.load, len(tokenizer))
+        model = get_bart_model(args.load, vocab_length= int(len(tokenizer)), tokenizer_name=args.tokenizer)
         save_dir = os.path.join(args.load, 'pytorch_model.bin')
         state_dict = torch.load(save_dir) 
         model.load_state_dict(state_dict)
     else:    
-        model = get_bart_model('gogamza/kobart-summarization', len(tokenizer))
+        model = get_bart_model('gogamza/kobart-summarization', vocab_length= int(len(tokenizer)), tokenizer_name=args.tokenizer)
     print('-'*10, 'Load tokenizer complete', '-'*10,)
 
     #################

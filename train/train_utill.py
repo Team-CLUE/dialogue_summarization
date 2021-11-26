@@ -129,7 +129,7 @@ def set_trainer_for_finetuning(
     '''
      # set training args
     training_args = Seq2SeqTrainingArguments(
-        output_dir='./results/fine_tuning/pretrained_only_dialogue30_10epoch', #./
+        output_dir='./results/fine_tuning/mecab/', #./
         overwrite_output_dir=True,
         num_train_epochs=epoch,
         per_device_train_batch_size=batch_size,

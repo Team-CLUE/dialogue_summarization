@@ -170,7 +170,7 @@ class Seq2SeqTrainer(Trainer):
                 
                 print('-'*100)
                 print("Predict: ", result)
-                print("Label: ",self.tokenizer.decode(item['labels'][idx], skip_special_tokens=True))
+                print("Label: ", self.tokenizer.decode(item['labels'][idx], skip_special_tokens=True))
 
         total_batch_size = self.args.eval_batch_size * self.args.world_size
         output.metrics.update(
