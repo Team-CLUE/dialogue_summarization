@@ -1,6 +1,7 @@
 #nsml: dacon/nia-tf:1.0
 
 from distutils.core import setup
+
 setup(
     name='ladder_networks',
     version='1.0',
@@ -10,6 +11,7 @@ setup(
         'torch==1.7.1',
         'soynlp',
         'rouge',
-        'git+https://github.com/haven-jeon/PyKoSpacing.git'
+        #'keras',
+        #'pycospacing @ git+https://github.com/haven-jeon/PyKoSpacing.git@0.5#egg=pycospacing-0.5'
     ]
 )

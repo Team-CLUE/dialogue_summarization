@@ -73,7 +73,6 @@ def set_trainer(
     '''
      # set training args
     training_args = Seq2SeqTrainingArguments(
-        report_to = 'tensorboard',
         output_dir='./',
         overwrite_output_dir=True,
         num_train_epochs=epoch,

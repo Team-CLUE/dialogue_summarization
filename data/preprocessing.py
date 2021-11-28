@@ -3,6 +3,7 @@ from typing import *
 
 import pandas as pd
 from pandas.core.frame import DataFrame
+import pickle as pkl
 
 import re
 from tqdm import tqdm
@@ -132,6 +133,7 @@ class Preprocess:
         if is_test:
             encoder_input = dataset['dialogue']
             decoder_input = [self.decoder_start_token] * len(dataset)
+            encoder_input = add_stemmed_knowledge(encoder_input)
             encoder_input = delete_char(encoder_input)
             encoder_input = delete_others(encoder_input)
             encoder_input = remove_repeat_char(encoder_input)
@@ -144,6 +146,7 @@ class Preprocess:
             encoder_input = dataset['dialogue']
             decoder_input = [self.decoder_start_token] * len(dataset)
             decoder_output = dataset['summary'].apply(lambda x: str(x) + self.eos_token)
+            encoder_input = add_stemmed_knowledge(encoder_input)
             encoder_input = delete_char(encoder_input)
             encoder_input = delete_others(encoder_input)
             encoder_input = remove_repeat_char(encoder_input)
@@ -154,10 +157,17 @@ class Preprocess:
             encoder_input = dataset['dialogue']
             decoder_input = dataset['summary'].apply(lambda x : self.decoder_start_token + str(x))
             decoder_output = dataset['summary'].apply(lambda x : str(x) + self.eos_token)
+            
+            encoder_input = add_stemmed_knowledge(encoder_input)
+            print(encoder_input[:3])
             encoder_input = delete_char(encoder_input)
+            print(encoder_input[:3])
             encoder_input = delete_others(encoder_input)
+            print(encoder_input[:3])
             encoder_input = remove_repeat_char(encoder_input)
+            print(encoder_input[:3])
             encoder_input = spacing_sent(encoder_input)
+            print(encoder_input[:3])
             
             if self.train_type == 'pretraining':
                 return list(encoder_input) + list(decoder_input), decoder_output
@@ -177,11 +187,13 @@ def delete_char(texts:List[str])->List[str]:
             학습전 문장에서 불필요한 characters 제거 후 반환
     '''
     preprocessed_text = []
-    proc = re.compile(r"[^가-힣a-zA-Z!?@#$%^&*<>()_ +]")
+    proc = re.compile(r"[^가-힣a-zA-Z!?@ +]")##$%^&*<>()_
     for text in tqdm(texts):
         text = proc.sub("", text).strip()
         if text:
             preprocessed_text.append(text)
+
+    print("deleted unnecessary tokens ([^가-힣a-zA-Z!?@ +])!!")
     return preprocessed_text
 
 def delete_others(texts:List[str])->List[str]:
@@ -213,6 +225,8 @@ def remove_repeat_char(texts):
         text = repeat_normalize(text, num_repeats=2).strip()
         if text:
             preprocessed_text.append(text)
+
+    print("Normalize repetaion!!")
     return preprocessed_text
 
 def spacing_sent(texts):
@@ -221,8 +235,36 @@ def spacing_sent(texts):
     """
     spacing = Spacing()
     preprocessed_text = []
-    for text in texts:
+    for text in tqdm(texts):
         text = spacing(text)
         if text:
             preprocessed_text.append(text)
+    
+    print("Spacing correction!!")
+    return preprocessed_text
+
+
+def add_stemmed_knowledge(texts:List[str])->List[str]:
+    '''
+        Arguments:
+            texts: List[str]
+                string 리스트
+        Return
+            List[str]
+        Summary:
+            학습전 문장에서 ㅇㅇ,ㅋㅋ,ㅌㅌ 등의 단어를 의미론적으로 바꿔주는 사전을 통해 데이터를 추가한 후 반환
+    '''
+
+    preprocessed_text = []
+    dict_path = "./stem_dict.bin"
+    
+    with open(dict_path, "rb" ) as f:
+        stem_dict = pkl.load(f)
+
+    for text in tqdm(texts):
+        for stem, replaced in stem_dict.items():
+            text = text.replace(stem, replaced)
+        preprocessed_text.append(text)
+
+    print("add necessary meaning (E.g. ㅋㅋ,ㅇㅇ,ㅌㅌ)!!")
     return preprocessed_text
