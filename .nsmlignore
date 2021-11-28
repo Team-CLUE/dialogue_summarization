@@ -5,3 +5,5 @@ results/
 nohup.out
 .gitignore
 mecab.txt
+.ipynb_checkpoints/
+preds/

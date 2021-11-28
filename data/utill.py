@@ -6,7 +6,7 @@ from typing import *
 
 from data.preprocessing import Preprocess
 
-DATASET_PATH = '/opt/ml/git/data/Training/'
+DATASET_PATH = '/opt/ml/git/data/Validation/'
 
 def train_data_loader(root_path:str)->List[str]:
     '''
