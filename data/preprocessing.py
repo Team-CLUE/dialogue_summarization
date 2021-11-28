@@ -6,6 +6,8 @@ from pandas.core.frame import DataFrame
 
 import re
 from tqdm import tqdm
+from soynlp.normalizer import *
+from pykospacing import Spacing
 
 class Preprocess:
     def __init__(self, 
@@ -132,6 +134,10 @@ class Preprocess:
             decoder_input = [self.decoder_start_token] * len(dataset)
             encoder_input = delete_char(encoder_input)
             encoder_input = delete_others(encoder_input)
+            encoder_input = remove_repeat_char(encoder_input)
+            encoder_input = spacing_sent(encoder_input)
+            
+            
             return encoder_input, decoder_input
 
         elif is_valid:
@@ -140,6 +146,8 @@ class Preprocess:
             decoder_output = dataset['summary'].apply(lambda x: str(x) + self.eos_token)
             encoder_input = delete_char(encoder_input)
             encoder_input = delete_others(encoder_input)
+            encoder_input = remove_repeat_char(encoder_input)
+            encoder_input = spacing_sent(encoder_input)
             return encoder_input, decoder_input, decoder_output
 
         else:
@@ -148,6 +156,8 @@ class Preprocess:
             decoder_output = dataset['summary'].apply(lambda x : str(x) + self.eos_token)
             encoder_input = delete_char(encoder_input)
             encoder_input = delete_others(encoder_input)
+            encoder_input = remove_repeat_char(encoder_input)
+            encoder_input = spacing_sent(encoder_input)
             
             if self.train_type == 'pretraining':
                 return list(encoder_input) + list(decoder_input), decoder_output
@@ -195,4 +205,24 @@ def delete_others(texts:List[str])->List[str]:
             text = text.replace(cd, '')
         preprocessed_text.append(text)
     print("deleted unnecessary tokens (E.g. #@URL#)!!")
+    return preprocessed_text
+
+def remove_repeat_char(texts):
+    preprocessed_text = []
+    for text in tqdm(texts):
+        text = repeat_normalize(text, num_repeats=2).strip()
+        if text:
+            preprocessed_text.append(text)
+    return preprocessed_text
+
+def spacing_sent(texts):
+    """
+    띄어쓰기를 보정합니다.
+    """
+    spacing = Spacing()
+    preprocessed_text = []
+    for text in texts:
+        text = spacing(text)
+        if text:
+            preprocessed_text.append(text)
     return preprocessed_text

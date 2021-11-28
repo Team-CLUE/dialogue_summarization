@@ -10,5 +10,6 @@ setup(
         'torch==1.7.1',
         'soynlp',
         'rouge',
+        'git+https://github.com/haven-jeon/PyKoSpacing.git'
     ]
 )
